@@ -234,6 +234,29 @@ namespace Desktop_Frames
                 CancelDrag();
             }
         }
+
+        public static void CompleteDragAtScreenPosition(System.Windows.Point screenPosition)
+        {
+            if (!_isDragging || _draggedIcon == null || _sourceWrapPanel == null) return;
+
+            try
+            {
+                if (IsOutsideSourceWindow(screenPosition))
+                {
+                    MoveDraggedItemToDesktop();
+                    return;
+                }
+
+                System.Windows.Point finalPosition = _sourceWrapPanel.PointFromScreen(screenPosition);
+                CompleteDrag(finalPosition);
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.UI,
+                    $"Error completing drag at screen position: {ex.Message}");
+                CancelDrag();
+            }
+        }
         #endregion
 
         #region Reordering Logic (The Core Fix)
@@ -379,6 +402,73 @@ namespace Desktop_Frames
             catch (Exception ex)
             {
                 LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.UI, $"Error refreshing frame UI: {ex.Message}");
+            }
+        }
+
+        private static bool IsOutsideSourceWindow(System.Windows.Point screenPosition)
+        {
+            try
+            {
+                Window sourceWindow = FindVisualParent<Window>(_sourceWrapPanel);
+                if (sourceWindow == null) return false;
+
+                System.Windows.Point pointInWindow = sourceWindow.PointFromScreen(screenPosition);
+                return pointInWindow.X < 0
+                    || pointInWindow.Y < 0
+                    || pointInWindow.X > sourceWindow.ActualWidth
+                    || pointInWindow.Y > sourceWindow.ActualHeight;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void MoveDraggedItemToDesktop()
+        {
+            try
+            {
+                if (_sourceItemsList == null || _draggedItem == null) return;
+
+                bool moved = CopyPasteManager.MoveToDesktop(_draggedItem);
+                if (!moved)
+                {
+                    CancelDrag();
+                    return;
+                }
+
+                JToken tokenToRemove = _draggedItem as JToken;
+                if (tokenToRemove != null)
+                {
+                    _sourceItemsList.Remove(tokenToRemove);
+                }
+                else
+                {
+                    string draggedFilename = _draggedItem["Filename"]?.ToString();
+                    for (int i = _sourceItemsList.Count - 1; i >= 0; i--)
+                    {
+                        if (string.Equals(_sourceItemsList[i]["Filename"]?.ToString(), draggedFilename, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _sourceItemsList.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < _sourceItemsList.Count; i++)
+                {
+                    _sourceItemsList[i]["DisplayOrder"] = i;
+                }
+
+                FrameDataManager.SaveFrameData();
+                RefreshFrameUI();
+                CancelDrag();
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.UI,
+                    $"Error moving dragged item to desktop: {ex.Message}");
+                CancelDrag();
             }
         }
 

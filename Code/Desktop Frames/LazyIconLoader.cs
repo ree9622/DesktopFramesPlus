@@ -54,32 +54,47 @@ namespace Desktop_Frames
                     {
                         if (token.IsCancellationRequested) break;
 
-                        ImageSource icon = null;
-                        lock (IconManager.IconCache)
+                        try
                         {
-                            if (IconManager.IconCache.TryGetValue(request.FilePath, out var cached))
-                                icon = cached;
-                        }
-
-                        if (icon == null)
-                        {
-                            icon = IconManager.GetIconForFile(request.TargetPath, request.FilePath, request.IsFolder, request.IsLink, request.IsShortcut, request.IconDict);
-                            if (icon != null && icon.CanFreeze && !icon.IsFrozen) icon.Freeze();
-                        }
-
-                        if (icon != null)
-                        {
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            ImageSource icon = null;
+                            lock (IconManager.IconCache)
                             {
-                                request.TargetImage.Source = icon;
-                                request.OnLoaded?.Invoke();
-                            }, System.Windows.Threading.DispatcherPriority.Background);
+                                if (IconManager.IconCache.TryGetValue(request.FilePath, out var cached))
+                                    icon = cached;
+                            }
+
+                            if (icon == null)
+                            {
+                                icon = IconManager.GetIconForFile(request.TargetPath, request.FilePath, request.IsFolder, request.IsLink, request.IsShortcut, request.IconDict);
+                                if (icon != null && icon.CanFreeze && !icon.IsFrozen) icon.Freeze();
+                            }
+
+                            if (icon != null)
+                            {
+                                await Application.Current.Dispatcher.InvokeAsync(() =>
+                                {
+                                    request.TargetImage.Source = icon;
+                                    request.OnLoaded?.Invoke();
+                                }, System.Windows.Threading.DispatcherPriority.Background);
+                            }
                         }
+                        catch (Exception ex)
+                        {
+                            LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.IconHandling,
+                                $"Icon load request failed for {request.FilePath}: {ex.Message}");
+                        }
+
                         processed++;
                     }
                     await Task.Delay(processed > 0 ? 30 : 100, token);
                 }
-                catch { break; }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.IconHandling,
+                        $"Icon loader loop recovered from error: {ex.Message}");
+                    await Task.Delay(250, token);
+                }
             }
         }
     }

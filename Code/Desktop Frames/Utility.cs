@@ -516,6 +516,9 @@ namespace Desktop_Frames
         [DllImport("gdi32.dll")]
         private static extern bool DeleteObject(IntPtr hObject);
 
+        [DllImport("user32.dll")]
+        private static extern bool DestroyIcon(IntPtr hIcon);
+
         // --- NEW: Native Shell API for robust icon extraction ---
         // --- UPDATED: Strict Unicode Shell API ---
     
@@ -548,7 +551,7 @@ namespace Desktop_Frames
                 if (!System.IO.Path.IsPathRooted(path))
                 {
                     string checkPath = ProfileManager.GetProfileFilePath(path);
-                    if (System.IO.File.Exists(checkPath)) path = checkPath;
+                    if (System.IO.File.Exists(checkPath) || System.IO.Directory.Exists(checkPath)) path = checkPath;
                 }
 
                 SHFILEINFO shinfo = new SHFILEINFO();
@@ -595,7 +598,7 @@ namespace Desktop_Frames
                     img.Freeze();
                 }
 
-                DeleteObject(shinfo.hIcon);
+                DestroyIcon(shinfo.hIcon);
                 return img;
             }
             catch (Exception ex)

@@ -72,6 +72,16 @@ namespace Desktop_Frames
             }
             return source;
         }
+
+        private static string ResolveProfileRelativePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path)) return path;
+
+            string profilePath = ProfileManager.GetProfileFilePath(path);
+            return System.IO.File.Exists(profilePath) || Directory.Exists(profilePath)
+                ? profilePath
+                : path;
+        }
         #endregion
 
         #region Main Icon Operations - Used by: Framemanager, PortalFramemanager, IconDragDropManager
@@ -514,6 +524,9 @@ namespace Desktop_Frames
         {
             try
             {
+                filePath = ResolveProfileRelativePath(filePath);
+                targetPath = ResolveProfileRelativePath(targetPath);
+
                 WshShell shell = new WshShell();
                 IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(filePath);
 
@@ -560,7 +573,10 @@ namespace Desktop_Frames
                 {
                     if (System.IO.File.Exists(targetPath))
                     {
-                        return System.Drawing.Icon.ExtractAssociatedIcon(targetPath).ToImageSource();
+                        using (var associatedIcon = System.Drawing.Icon.ExtractAssociatedIcon(targetPath))
+                        {
+                            if (associatedIcon != null) return FreezeIcon(associatedIcon.ToImageSource());
+                        }
                     }
                     else if (Directory.Exists(targetPath))
                     {
@@ -569,13 +585,13 @@ namespace Desktop_Frames
                 }
 
                 // Final fallback
-                return new BitmapImage(new Uri("pack://application:,,,/Resources/file-WhiteX.png"));
+                return CreateFrozenBitmap("pack://application:,,,/Resources/file-WhiteX.png");
             }
             catch (Exception ex)
             {
                 LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.IconHandling,
                     $"Error extracting shortcut icon for {filePath}: {ex.Message}");
-                return new BitmapImage(new Uri("pack://application:,,,/Resources/file-WhiteX.png"));
+                return CreateFrozenBitmap("pack://application:,,,/Resources/file-WhiteX.png");
             }
         }
 
@@ -599,7 +615,7 @@ namespace Desktop_Frames
                             hIcon[0],
                             Int32Rect.Empty,
                             BitmapSizeOptions.FromEmptyOptions()
-                        );
+                        ).GetAsFrozen() as ImageSource;
                     }
                     finally
                     {
@@ -624,6 +640,8 @@ namespace Desktop_Frames
         /// </summary>
         private static ImageSource GetFolderIcon(string folderPath)
         {
+            folderPath = ResolveProfileRelativePath(folderPath);
+
             return Directory.Exists(folderPath) ?
                 CreateFrozenBitmap("pack://application:,,,/Resources/folder-White.png") :
                 CreateFrozenBitmap("pack://application:,,,/Resources/folder-WhiteX.png");
@@ -660,9 +678,19 @@ namespace Desktop_Frames
         {
             try
             {
+                filePath = ResolveProfileRelativePath(filePath);
+
                 if (System.IO.File.Exists(filePath))
                 {
-                    return FreezeIcon(System.Drawing.Icon.ExtractAssociatedIcon(filePath).ToImageSource());
+                    using (var associatedIcon = System.Drawing.Icon.ExtractAssociatedIcon(filePath))
+                    {
+                        if (associatedIcon != null) return FreezeIcon(associatedIcon.ToImageSource());
+                    }
+
+                    ImageSource shellIcon = Utility.GetShellIcon(filePath, false);
+                    if (shellIcon != null) return FreezeIcon(shellIcon);
+
+                    return CreateFrozenBitmap("pack://application:,,,/Resources/file-WhiteX.png");
                 }
                 else
                 {
@@ -721,7 +749,10 @@ namespace Desktop_Frames
                     if (customIcon != null) return customIcon;
 
                     // Fallback to standard extraction if ExtractIconFromFile fails
-                    return System.Drawing.Icon.ExtractAssociatedIcon(iconFile).ToImageSource();
+                    using (var associatedIcon = System.Drawing.Icon.ExtractAssociatedIcon(iconFile))
+                    {
+                        if (associatedIcon != null) return FreezeIcon(associatedIcon.ToImageSource());
+                    }
                 }
             }
             catch (Exception ex)

@@ -52,6 +52,47 @@ namespace Desktop_Frames
             }
         }
 
+        public static int RepairCurrentProfileStoredItemShortcuts()
+        {
+            try
+            {
+                if (FrameDataManager.FrameData == null) return 0;
+
+                int repaired = 0;
+                bool modified = false;
+                string profileDir = ProfileManager.CurrentProfileDir;
+
+                foreach (dynamic frame in FrameDataManager.FrameData)
+                {
+                    if (frame is not JObject frameObject) continue;
+
+                    foreach (JObject item in EnumerateItems(frameObject))
+                    {
+                        if (RepairStoredItemShortcut(profileDir, item))
+                        {
+                            repaired++;
+                            modified = true;
+                        }
+                    }
+                }
+
+                if (modified)
+                {
+                    FrameDataManager.SaveFrameData();
+                    LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.General,
+                        $"Repaired {repaired} stored desktop item shortcuts.");
+                }
+
+                return repaired;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.General,
+                    $"Stored desktop item shortcut repair failed: {ex.Message}");
+                return 0;
+            }
+        }
+
         public static void RestoreAllProfilesToDesktop()
         {
             try
@@ -148,6 +189,23 @@ namespace Desktop_Frames
                 string targetPath = GetShortcutTarget(shortcutPath);
                 string storedDir = Path.Combine(profileDir, StoredDesktopItemsFolder);
 
+                if (!restoreToDesktop
+                    && IsDesktopPath(targetPath)
+                    && Directory.Exists(targetPath)
+                    && !ShouldSkipCollectingPath(targetPath))
+                {
+                    Directory.CreateDirectory(storedDir);
+                    string collectedPath = GetUniquePath(Path.Combine(storedDir, Path.GetFileName(targetPath)));
+                    MovePath(targetPath, collectedPath);
+                    RetargetShortcut(shortcutPath, collectedPath);
+
+                    item[RestoreToDesktopOnExitKey] = true;
+                    item[DesktopRestoreKindKey] = FileKind;
+                    item[DesktopRestorePathKey] = targetPath;
+                    item[StoredItemPathKey] = collectedPath;
+                    return true;
+                }
+
                 if (!restoreToDesktop && IsUnderDirectory(targetPath, storedDir))
                 {
                     item[RestoreToDesktopOnExitKey] = true;
@@ -163,11 +221,11 @@ namespace Desktop_Frames
                 }
 
                 string desktopPath = GetString(item, DesktopRestorePathKey);
-                if (!IsDesktopPath(desktopPath) || !IoFile.Exists(desktopPath)) return false;
+                if (!IsDesktopPath(desktopPath) || !PathExists(desktopPath)) return false;
 
                 Directory.CreateDirectory(storedDir);
                 string storedPath = GetUniquePath(Path.Combine(storedDir, Path.GetFileName(desktopPath)));
-                IoFile.Move(desktopPath, storedPath);
+                MovePath(desktopPath, storedPath);
                 RetargetShortcut(shortcutPath, storedPath);
 
                 item[StoredItemPathKey] = storedPath;
@@ -177,6 +235,41 @@ namespace Desktop_Frames
             {
                 LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.General,
                     $"Could not collect desktop item for running session: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool RepairStoredItemShortcut(string profileDir, JObject item)
+        {
+            try
+            {
+                if (!GetBoolean(item, RestoreToDesktopOnExitKey)) return false;
+                if (!string.Equals(GetString(item, DesktopRestoreKindKey), FileKind, StringComparison.OrdinalIgnoreCase)) return false;
+
+                string shortcutPath = ResolveProfilePath(profileDir, GetString(item, "Filename"));
+                if (!IsShortcutFile(shortcutPath)) return false;
+
+                string storedPath = ResolveProfilePath(profileDir, GetString(item, StoredItemPathKey));
+                if (string.IsNullOrWhiteSpace(storedPath) || !PathExists(storedPath)) return false;
+
+                string currentTarget = GetShortcutTarget(shortcutPath);
+                if (string.Equals(currentTarget, storedPath, StringComparison.OrdinalIgnoreCase)) return false;
+
+                RetargetShortcut(shortcutPath, storedPath);
+                item[StoredItemPathKey] = storedPath;
+
+                string desktopRestorePath = GetString(item, DesktopRestorePathKey);
+                if (!IsDesktopPath(desktopRestorePath))
+                {
+                    item[DesktopRestorePathKey] = Path.Combine(GetUserDesktopPath(), Path.GetFileName(storedPath));
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.General,
+                    $"Could not repair stored desktop item shortcut: {ex.Message}");
                 return false;
             }
         }
@@ -231,7 +324,7 @@ namespace Desktop_Frames
                     return true;
                 }
 
-                if (!IoFile.Exists(targetPath) || !IsUnderDirectory(targetPath, storedDir))
+                if (!PathExists(targetPath) || !IsUnderDirectory(targetPath, storedDir))
                 {
                     return false;
                 }
@@ -244,7 +337,7 @@ namespace Desktop_Frames
 
                 desktopPath = GetUniquePath(desktopPath);
                 Directory.CreateDirectory(Path.GetDirectoryName(desktopPath));
-                IoFile.Move(targetPath, desktopPath);
+                MovePath(targetPath, desktopPath);
                 RetargetShortcut(shortcutPath, desktopPath);
 
                 item[DesktopRestorePathKey] = desktopPath;
@@ -272,6 +365,48 @@ namespace Desktop_Frames
                 && path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool PathExists(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path)
+                && (IoFile.Exists(path) || Directory.Exists(path));
+        }
+
+        private static void MovePath(string sourcePath, string destinationPath)
+        {
+            if (Directory.Exists(sourcePath))
+            {
+                Directory.Move(sourcePath, destinationPath);
+                return;
+            }
+
+            IoFile.Move(sourcePath, destinationPath);
+        }
+
+        private static bool ShouldSkipCollectingPath(string path)
+        {
+            try
+            {
+                string fullPath = Path.GetFullPath(path)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string appBase = Path.GetFullPath(AppContext.BaseDirectory)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                if (string.Equals(fullPath, appBase, StringComparison.OrdinalIgnoreCase)
+                    || appBase.StartsWith(fullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string folderName = Path.GetFileName(fullPath);
+                return folderName.StartsWith("DesktopFramesPlus-test-run-", StringComparison.OrdinalIgnoreCase)
+                    || folderName.StartsWith("DesktopFramesPlus-source-run-", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
         private static string GetShortcutTarget(string shortcutPath)
         {
             WshShell shell = new WshShell();
@@ -285,7 +420,9 @@ namespace Desktop_Frames
             IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
             shortcut.TargetPath = targetPath;
 
-            string workingDirectory = Path.GetDirectoryName(targetPath);
+            string workingDirectory = Directory.Exists(targetPath)
+                ? targetPath
+                : Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrWhiteSpace(workingDirectory))
             {
                 shortcut.WorkingDirectory = workingDirectory;

@@ -24,8 +24,15 @@ public class NonActivatingWindow : Window
     private const int WM_MOUSEACTIVATE = 0x0021;
     private const int MA_NOACTIVATE = 3;
     private const int GWL_EXSTYLE = -20;
+    private const int GWL_STYLE = -16;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_APPWINDOW = 0x00040000;
+    private const int WS_CHILD = 0x40000000;
+    private const int WS_POPUP = unchecked((int)0x80000000);
     private bool _focusPreventionEnabled = true;
+    private bool _isDesktopChild = false;
+    private IntPtr _originalParent = IntPtr.Zero;
 
     // --- Idle Fade-Out Fields ---
     private System.Windows.Threading.DispatcherTimer _idleTimer;
@@ -136,12 +143,104 @@ public class NonActivatingWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetParent(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
     private const int SW_SHOWNOACTIVATE = 4;
+    private static readonly IntPtr HWND_TOP = IntPtr.Zero;
+    private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+    private const uint SMTO_NORMAL = 0x0000;
+    private const uint WM_SPAWN_WORKERW = 0x052C;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
     public void ShowWithoutActivation()
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    }
+
+    public void PinForShowDesktop()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        GetWindowRect(hwnd, out RECT rect);
+
+        if (!_isDesktopChild)
+        {
+            _originalParent = GetParent(hwnd);
+        }
+        else
+        {
+            SetParent(hwnd, IntPtr.Zero);
+            _isDesktopChild = false;
+            _originalParent = IntPtr.Zero;
+        }
+
+        int style = GetWindowLong(hwnd, GWL_STYLE);
+        SetWindowLong(hwnd, GWL_STYLE, (style & ~WS_CHILD) | WS_POPUP);
+
+        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, (exStyle & ~WS_EX_APPWINDOW & ~0x00000008) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        Topmost = false;
+        SetWindowPos(hwnd, HWND_NOTOPMOST, rect.Left, rect.Top, Math.Max(1, rect.Right - rect.Left), Math.Max(1, rect.Bottom - rect.Top), SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
+    }
+
+    public void ReleaseShowDesktopPin()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        GetWindowRect(hwnd, out RECT rect);
+
+        if (_isDesktopChild)
+        {
+            SetParent(hwnd, _originalParent);
+            _isDesktopChild = false;
+            _originalParent = IntPtr.Zero;
+        }
+
+        int style = GetWindowLong(hwnd, GWL_STYLE);
+        SetWindowLong(hwnd, GWL_STYLE, (style & ~WS_CHILD) | WS_POPUP);
+
+        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, (exStyle & ~WS_EX_TOOLWINDOW & ~0x00000008) | WS_EX_NOACTIVATE);
+
+        Topmost = false;
+        SetWindowPos(hwnd, HWND_NOTOPMOST, rect.Left, rect.Top, Math.Max(1, rect.Right - rect.Left), Math.Max(1, rect.Bottom - rect.Top), SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
     }
 
     [DllImport("user32.dll")]

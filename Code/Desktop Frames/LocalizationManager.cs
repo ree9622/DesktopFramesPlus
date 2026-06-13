@@ -187,6 +187,7 @@ namespace Desktop_Frames
             ["Delete this frame"] = "이 프레임 삭제",
             ["Auto roll"] = "자동 말기",
             ["Always on top"] = "항상 위에 표시",
+            ["Show on Show Desktop"] = "바탕화면 보기에서도 표시",
             ["Hide Frame"] = "프레임 숨기기",
             ["Peek Behind"] = "뒤쪽 잠깐 보기",
             ["Clear Dead Shortcuts"] = "깨진 바로가기 정리",

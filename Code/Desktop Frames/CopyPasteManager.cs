@@ -96,6 +96,55 @@ namespace Desktop_Frames
                 // Silent failure - no user notification required
             }
         }
+
+        public static bool MoveToDesktop(dynamic icon)
+        {
+            try
+            {
+                IDictionary<string, object> iconDict = icon is IDictionary<string, object> dict
+                    ? dict
+                    : ((JObject)icon).ToObject<IDictionary<string, object>>();
+
+                string frameItemPath = ResolveProfilePath(GetString(iconDict, "Filename"));
+                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                if (string.IsNullOrWhiteSpace(desktopPath) || !Directory.Exists(desktopPath)) return false;
+
+                string restoreKind = GetString(iconDict, DesktopItemLifecycleManager.DesktopRestoreKindKey);
+                string storedItemPath = ResolveProfilePath(GetString(iconDict, DesktopItemLifecycleManager.StoredItemPathKey));
+                string desktopRestorePath = GetString(iconDict, DesktopItemLifecycleManager.DesktopRestorePathKey);
+
+                if (string.Equals(restoreKind, DesktopItemLifecycleManager.FileKind, StringComparison.OrdinalIgnoreCase)
+                    && PathExists(storedItemPath))
+                {
+                    string desiredPath = IsDesktopPath(desktopRestorePath)
+                        ? desktopRestorePath
+                        : Path.Combine(desktopPath, Path.GetFileName(storedItemPath));
+
+                    string finalPath = GetUniquePath(desiredPath);
+                    MovePath(storedItemPath, finalPath);
+                    DeleteFrameShortcut(frameItemPath);
+                    return true;
+                }
+
+                if (!File.Exists(frameItemPath)) return false;
+
+                string desiredShortcutPath = string.Equals(restoreKind, DesktopItemLifecycleManager.ShortcutKind, StringComparison.OrdinalIgnoreCase)
+                    && IsDesktopPath(desktopRestorePath)
+                        ? desktopRestorePath
+                        : Path.Combine(desktopPath, Path.GetFileName(frameItemPath));
+
+                string finalShortcutPath = GetUniquePath(desiredShortcutPath);
+                File.Copy(frameItemPath, finalShortcutPath, false);
+                DeleteFrameShortcut(frameItemPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.FrameUpdate,
+                    $"Error moving item to desktop: {ex.Message}");
+                return false;
+            }
+        }
         #endregion
 
         #region Public Properties - State Access
@@ -445,6 +494,107 @@ namespace Desktop_Frames
             {
                 LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.FrameUpdate,
                     $"Error checking copied item availability: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static string GetString(IDictionary<string, object> dict, string key)
+        {
+            return dict != null && dict.TryGetValue(key, out object value)
+                ? value?.ToString() ?? string.Empty
+                : string.Empty;
+        }
+
+        private static string ResolveProfilePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            return Path.IsPathRooted(path) ? path : Path.Combine(ProfileManager.CurrentProfileDir, path);
+        }
+
+        private static bool PathExists(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path)
+                && (File.Exists(path) || Directory.Exists(path));
+        }
+
+        private static void MovePath(string sourcePath, string destinationPath)
+        {
+            if (Directory.Exists(sourcePath))
+            {
+                Directory.Move(sourcePath, destinationPath);
+                return;
+            }
+
+            File.Move(sourcePath, destinationPath);
+        }
+
+        private static string GetUniquePath(string desiredPath)
+        {
+            if (!File.Exists(desiredPath) && !Directory.Exists(desiredPath)) return desiredPath;
+
+            string directory = Path.GetDirectoryName(desiredPath);
+            string name = Path.GetFileNameWithoutExtension(desiredPath);
+            string extension = Path.GetExtension(desiredPath);
+            int counter = 1;
+            string candidate;
+
+            do
+            {
+                candidate = Path.Combine(directory, $"{name} ({counter++}){extension}");
+            }
+            while (File.Exists(candidate) || Directory.Exists(candidate));
+
+            return candidate;
+        }
+
+        private static void DeleteFrameShortcut(string shortcutPath)
+        {
+            try
+            {
+                if (File.Exists(shortcutPath) && IsUnderDirectory(shortcutPath, ProfileManager.CurrentProfileDir))
+                {
+                    File.Delete(shortcutPath);
+                }
+            }
+            catch { }
+        }
+
+        private static bool IsDesktopPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+
+            try
+            {
+                string itemDir = Path.GetDirectoryName(Path.GetFullPath(path));
+                if (string.IsNullOrWhiteSpace(itemDir)) return false;
+
+                string userDesktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+
+                return string.Equals(itemDir, userDesktop, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(itemDir, commonDesktop, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsUnderDirectory(string path, string directory)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(directory)) return false;
+
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string fullDirectory = Path.GetFullPath(directory)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+
+                return fullPath.StartsWith(fullDirectory, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
                 return false;
             }
         }

@@ -12,7 +12,7 @@ namespace Desktop_Frames
     {
         private TrayManager _trayManager;
         private TargetChecker _targetChecker;
-        private static bool _desktopIsShown = false;
+        private System.Windows.Threading.DispatcherTimer _desktopRestoreMonitor;
         private static Mutex _mutex;
         private const string UNIQUE_APP_NAME = "Global\\DesktopFramesPlus_Mutex_UniqueId_v2";
 
@@ -20,6 +20,8 @@ namespace Desktop_Frames
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            EnsureWpfFontEnvironment();
+
             // --- 1. INITIALIZE PROFILES & SETTINGS FIRST ---
             // This ensures we know the user's true DisableSingleInstance preference immediately
             try
@@ -135,6 +137,7 @@ namespace Desktop_Frames
                     {
                         GlobalHotkeyManager.WindowsPlusDDetected += OnWindowsPlusDDetected;
                         GlobalHotkeyManager.StartMonitoring();
+                        StartDesktopRestoreMonitor();
                         LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.General,
                             "GlobalHotkeyManager: Successfully initialized hotkey monitoring");
                     }
@@ -188,6 +191,12 @@ namespace Desktop_Frames
             }
             catch { }
 
+            try
+            {
+                _desktopRestoreMonitor?.Stop();
+            }
+            catch { }
+
             InterCore.Cleanup();
             try
             {
@@ -210,57 +219,60 @@ namespace Desktop_Frames
         {
             try
             {
-                _desktopIsShown = !_desktopIsShown;
-                if (_desktopIsShown)
-                {
-                    var restoreTimer = new System.Windows.Threading.DispatcherTimer
-                    {
-                        Interval = TimeSpan.FromMilliseconds(800)
-                    };
-                    restoreTimer.Tick += (timerSender, timerArgs) =>
-                    {
-                        restoreTimer.Stop();
-                        RestoreAllframeWindows();
-                    };
-                    restoreTimer.Start();
-                }
-
-                var resetTimer = new System.Windows.Threading.DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(10)
-                };
-                resetTimer.Tick += (timerSender, timerArgs) =>
-                {
-                    resetTimer.Stop();
-                    _desktopIsShown = false;
-                };
-                resetTimer.Start();
+                Framemanager.UpdateShowDesktopPinState(true);
             }
             catch { }
         }
 
+        private void StartDesktopRestoreMonitor()
+        {
+            if (_desktopRestoreMonitor != null) return;
+
+            _desktopRestoreMonitor = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+
+            _desktopRestoreMonitor.Tick += (sender, args) =>
+            {
+                try
+                {
+                    if (!Framemanager.HasShowDesktopPinnedFrames() && !Framemanager.HasActiveShowDesktopPins()) return;
+                    Framemanager.UpdateShowDesktopPinState(true);
+                }
+                catch { }
+            };
+
+            _desktopRestoreMonitor.Start();
+        }
+
         private static void RestoreAllframeWindows()
+        {
+            RestoreShowDesktopFrameWindows();
+        }
+
+        private static void RestoreShowDesktopFrameWindows()
         {
             try
             {
-                var frameWindows = System.Windows.Application.Current.Windows
-                    .OfType<NonActivatingWindow>()
-                    .ToList();
+                Framemanager.RestoreShowDesktopPinnedFrames();
+            }
+            catch { }
+        }
 
-                foreach (var frameWindow in frameWindows)
+        private static void EnsureWpfFontEnvironment()
+        {
+            try
+            {
+                string windir = Environment.GetEnvironmentVariable("windir", EnvironmentVariableTarget.Process);
+                if (!string.IsNullOrWhiteSpace(windir) && System.IO.Directory.Exists(windir)) return;
+
+                string systemRoot = Environment.GetEnvironmentVariable("SystemRoot", EnvironmentVariableTarget.Process)
+                    ?? Environment.GetEnvironmentVariable("SystemRoot", EnvironmentVariableTarget.Machine);
+
+                if (!string.IsNullOrWhiteSpace(systemRoot) && System.IO.Directory.Exists(systemRoot))
                 {
-                    try
-                    {
-                        if (frameWindow.WindowState == WindowState.Minimized)
-                            frameWindow.WindowState = WindowState.Normal;
-
-                        if (!frameWindow.IsVisible)
-                            frameWindow.Show();
-
-                        frameWindow.Topmost = true;
-                        frameWindow.Topmost = false;
-                    }
-                    catch { }
+                    Environment.SetEnvironmentVariable("windir", systemRoot, EnvironmentVariableTarget.Process);
                 }
             }
             catch { }

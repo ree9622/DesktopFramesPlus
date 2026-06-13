@@ -72,10 +72,6 @@ namespace Desktop_Frames
             public POINT ptMaxTrackSize;
         }
 
-        [DllImport("user32.dll")]
-        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
-
         // Tracks temporary navigation paths for Portal frames. Key: frameId, Value: CurrentPath
         private static Dictionary<string, string> _portalNavigationStates = new Dictionary<string, string>();
 
@@ -93,9 +89,151 @@ namespace Desktop_Frames
         //resize feedback
         private static Window _sizeFeedbackWindow;
         private static System.Windows.Threading.DispatcherTimer _hideTimer;
+        private static readonly HashSet<string> _framesBeingResized = new HashSet<string>();
+        private static readonly Dictionary<string, DispatcherTimer> _frameBoundsSaveTimers = new Dictionary<string, DispatcherTimer>();
+        private static readonly HashSet<string> _showDesktopPinnedFrameIds = new HashSet<string>();
 
         // Add near other static fields
         private static TargetChecker _currentTargetChecker;
+
+        private static bool GetFrameBoolean(dynamic frame, string propertyName)
+        {
+            try
+            {
+                if (frame is JObject jFrame)
+                {
+                    JToken token = jFrame[propertyName];
+                    if (token == null) return false;
+                    if (token.Type == JTokenType.Boolean) return token.Value<bool>();
+                    return string.Equals(token.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (frame is IDictionary<string, object> dict && dict.TryGetValue(propertyName, out object value))
+                {
+                    if (value is bool boolValue) return boolValue;
+                    return string.Equals(value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+                }
+
+                object propertyValue = frame.GetType().GetProperty(propertyName)?.GetValue(frame, null);
+                if (propertyValue is bool propertyBool) return propertyBool;
+                return string.Equals(propertyValue?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static dynamic GetFrameForWindow(NonActivatingWindow window)
+        {
+            string frameId = window?.Tag?.ToString();
+            if (string.IsNullOrEmpty(frameId) || FrameDataManager.FrameData == null) return null;
+            return FrameDataManager.FrameData.FirstOrDefault(f => f.Id?.ToString() == frameId);
+        }
+
+        private static bool ShouldShowOnDesktop(NonActivatingWindow window)
+        {
+            dynamic frame = GetFrameForWindow(window);
+            if (frame == null) return false;
+            return GetFrameBoolean(frame, "AlwaysOnTop") && !GetFrameBoolean(frame, "IsHidden");
+        }
+
+        public static bool HasShowDesktopPinnedFrames()
+        {
+            try
+            {
+                return System.Windows.Application.Current?.Windows
+                    .OfType<NonActivatingWindow>()
+                    .Any(ShouldShowOnDesktop) == true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool HasActiveShowDesktopPins()
+        {
+            return _showDesktopPinnedFrameIds.Count > 0;
+        }
+
+        public static void RestoreShowDesktopPinnedFrames()
+        {
+            UpdateShowDesktopPinState(true);
+        }
+
+        public static void UpdateShowDesktopPinState(bool desktopShown)
+        {
+            try
+            {
+                var frameWindows = System.Windows.Application.Current.Windows
+                    .OfType<NonActivatingWindow>()
+                    .ToList();
+
+                foreach (var frameWindow in frameWindows)
+                {
+                    try
+                    {
+                        string frameId = frameWindow.Tag?.ToString();
+                        bool shouldPin = ShouldShowOnDesktop(frameWindow);
+
+                        if (shouldPin)
+                        {
+                            if (frameWindow.WindowState == WindowState.Minimized)
+                                frameWindow.WindowState = WindowState.Normal;
+
+                            if (!frameWindow.IsVisible)
+                                frameWindow.Show();
+
+                            frameWindow.PinForShowDesktop();
+
+                            if (!string.IsNullOrEmpty(frameId))
+                                _showDesktopPinnedFrameIds.Add(frameId);
+
+                            continue;
+                        }
+
+                        if (!string.IsNullOrEmpty(frameId) && _showDesktopPinnedFrameIds.Remove(frameId))
+                            frameWindow.ReleaseShowDesktopPin();
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static void ScheduleFrameBoundsSave(string frameId)
+        {
+            if (string.IsNullOrEmpty(frameId)) return;
+
+            if (!_frameBoundsSaveTimers.TryGetValue(frameId, out DispatcherTimer timer))
+            {
+                timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    _frameBoundsSaveTimers.Remove(frameId);
+                    FrameDataManager.SaveFrameData();
+                };
+                _frameBoundsSaveTimers[frameId] = timer;
+            }
+
+            timer.Stop();
+            timer.Start();
+        }
+
+        private static void SaveFrameBoundsNow(string frameId)
+        {
+            if (string.IsNullOrEmpty(frameId)) return;
+
+            if (_frameBoundsSaveTimers.TryGetValue(frameId, out DispatcherTimer timer))
+            {
+                timer.Stop();
+                _frameBoundsSaveTimers.Remove(frameId);
+            }
+
+            FrameDataManager.SaveFrameData();
+        }
 
         #region Auto-Hide frames Engine
         private static DispatcherTimer _masterAutoHideTimer;
@@ -1750,7 +1888,9 @@ namespace Desktop_Frames
 
         private static string MoveDesktopFileIntoProfileStorage(string desktopFile)
         {
-            if (!System.IO.File.Exists(desktopFile) || !IsFromDesktop(desktopFile)) return desktopFile;
+            bool isFile = System.IO.File.Exists(desktopFile);
+            bool isDirectory = System.IO.Directory.Exists(desktopFile);
+            if ((!isFile && !isDirectory) || !IsFromDesktop(desktopFile)) return desktopFile;
 
             string storageDir = ProfileManager.GetProfileFilePath("Stored Desktop Items");
             if (!System.IO.Directory.Exists(storageDir)) System.IO.Directory.CreateDirectory(storageDir);
@@ -1759,14 +1899,22 @@ namespace Desktop_Frames
             string destination = System.IO.Path.Combine(storageDir, fileName);
             int counter = 1;
 
-            while (System.IO.File.Exists(destination))
+            while (System.IO.File.Exists(destination) || System.IO.Directory.Exists(destination))
             {
                 string name = System.IO.Path.GetFileNameWithoutExtension(fileName);
                 string extension = System.IO.Path.GetExtension(fileName);
                 destination = System.IO.Path.Combine(storageDir, $"{name} ({counter++}){extension}");
             }
 
-            System.IO.File.Move(desktopFile, destination);
+            if (isDirectory)
+            {
+                System.IO.Directory.Move(desktopFile, destination);
+            }
+            else
+            {
+                System.IO.File.Move(desktopFile, destination);
+            }
+
             return destination;
         }
 
@@ -2352,29 +2500,13 @@ namespace Desktop_Frames
                         }
                         else if (propertyName == "AlwaysOnTop")
                         {
-                            bool alwaysOnTop = value?.ToLower() == "true";
-                            win.Topmost = alwaysOnTop;
+                            bool showOnDesktop = value?.ToLower() == "true";
+                            if (showOnDesktop)
+                                win.PinForShowDesktop();
+                            else
+                                win.ReleaseShowDesktopPin();
 
-                            // --- BULLETPROOF FIX: Delay Native OS Call to beat WPF's internal queue ---
-                            win.Dispatcher.BeginInvoke(new Action(() =>
-                            {
-                                // Brute-force WPF to re-evaluate the handle state
-                                if (alwaysOnTop) { win.Topmost = false; win.Topmost = true; }
-
-                                var hwnd = new System.Windows.Interop.WindowInteropHelper(win).Handle;
-                                if (hwnd != IntPtr.Zero)
-                                {
-                                    IntPtr HWND_TOPMOST = new IntPtr(-1);
-                                    IntPtr HWND_NOTOPMOST = new IntPtr(-2);
-                                    uint SWP_NOMOVE = 0x0002;
-                                    uint SWP_NOSIZE = 0x0001;
-                                    uint SWP_NOACTIVATE = 0x0010;
-
-                                    SetWindowPos(hwnd, alwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-                                }
-                            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-
-                            LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.FrameUpdate, $"Set Topmost to {alwaysOnTop} for frame '{frame.Title}'");
+                            LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.FrameUpdate, $"Set Show-on-Desktop to {showOnDesktop} for frame '{frame.Title}'");
                         }
                         //step 7
                         else if (propertyName == "IsRolled")
@@ -4237,6 +4369,7 @@ namespace Desktop_Frames
             // If Desktop-managed items were restored on the last app exit, collect them
             // back into the active profile before building frame icons.
             DesktopItemLifecycleManager.CollectCurrentProfileDesktopItems();
+            DesktopItemLifecycleManager.RepairCurrentProfileStoredItemShortcuts();
 
             // Start emergency cleanup timer if not already running
             if (_transitionCleanupTimer == null)
@@ -4921,12 +5054,12 @@ namespace Desktop_Frames
             };
             CnMnFramemanager.Items.Add(miAutoRoll);
 
-            // --- NEW: Always On Top Menu Item ---
-            MenuItem miAlwaysOnTop = new MenuItem { Header = T("Always on top"), IsCheckable = true };
+            // Show after Windows "Show Desktop" without keeping the frame above normal windows.
+            MenuItem miAlwaysOnTop = new MenuItem { Header = T("Show on Show Desktop"), IsCheckable = true };
             miAlwaysOnTop.IsChecked = frame.AlwaysOnTop?.ToString().ToLower() == "true";
             miAlwaysOnTop.Click += (s, e) =>
             {
-                UpdateFrameProperty(frame, "AlwaysOnTop", miAlwaysOnTop.IsChecked.ToString().ToLower(), $"Set Always on Top to {miAlwaysOnTop.IsChecked}");
+                UpdateFrameProperty(frame, "AlwaysOnTop", miAlwaysOnTop.IsChecked.ToString().ToLower(), $"Set Show on Show Desktop to {miAlwaysOnTop.IsChecked}");
             };
             CnMnFramemanager.Items.Add(miAlwaysOnTop);
 
@@ -4955,7 +5088,7 @@ namespace Desktop_Frames
                 WindowStyle = WindowStyle.None,
                 Content = cborder,
                 ResizeMode = frame.IsLocked?.ToString().ToLower() == "true" ? ResizeMode.NoResize : ResizeMode.CanResizeWithGrip,
-                Topmost = frame.AlwaysOnTop?.ToString().ToLower() == "true", // --- NEW: Apply Always On Top ---
+                Topmost = false,
                 // ResizeMode = ResizeMode.CanResizeWithGrip,
                 Width = (double)frame.Width,
                 Height = (double)frame.Height,
@@ -5297,12 +5430,10 @@ namespace Desktop_Frames
                     {
 
                     }
-                    // Save to JSON
-                    //   MessageBox.Show("Debug: SizeChanged handler called. Saving frame data.");
-                    FrameDataManager.SaveFrameData();
-                    var verifyFrame = FrameDataManager.FrameData.FirstOrDefault(f => f.Id?.ToString() == frameId);
-                    double verifyHeight = Convert.ToDouble(verifyFrame.Height?.ToString() ?? "0");
-                    double verifyUnrolled = Convert.ToDouble(verifyFrame.UnrolledHeight?.ToString() ?? "0");
+                    if (!_framesBeingResized.Contains(frameId))
+                    {
+                        ScheduleFrameBoundsSave(frameId);
+                    }
 
                 }
                 else
@@ -5554,6 +5685,8 @@ namespace Desktop_Frames
             // Make window focusable for key events during drag
             win.Focusable = true;
             win.Show();
+            if (ShouldShowOnDesktop(win))
+                win.PinForShowDesktop();
 
 
 
@@ -7029,7 +7162,7 @@ namespace Desktop_Frames
                                         shortcut.TargetPath = droppedFile;
                                         if (isFolder) shortcut.WorkingDirectory = droppedFile;
                                         shortcut.Save();
-                                        shouldMoveDesktopFile = SettingsManager.DeleteOriginalShortcutsOnDrop && !isFolder && IsFromDesktop(droppedFile);
+                                        shouldMoveDesktopFile = SettingsManager.DeleteOriginalShortcutsOnDrop && IsFromDesktop(droppedFile);
 
                                         if (shouldMoveDesktopFile)
                                         {
@@ -7039,7 +7172,7 @@ namespace Desktop_Frames
                                                 string storedPath = MoveDesktopFileIntoProfileStorage(droppedFile);
                                                 if (!string.Equals(storedPath, droppedFile, StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    RetargetShortcut(shortcutName, storedPath, false);
+                                                    RetargetShortcut(shortcutName, storedPath, isFolder);
                                                     targetPath = storedPath;
                                                     storedDesktopPath = storedPath;
                                                 }
@@ -7324,10 +7457,6 @@ namespace Desktop_Frames
 
 
 
-            if (SettingsManager.EnableDimensionSnap)
-            {
-                win.SizeChanged += UpdateSizeFeedback;
-            }
             win.LocationChanged += (s, e) =>
             {
                 // Get current frame reference by ID to avoid stale references
@@ -7341,10 +7470,13 @@ namespace Desktop_Frames
                 var currentFrame = FrameDataManager.FrameData.FirstOrDefault(f => f.Id?.ToString() == frameId);
                 if (currentFrame != null)
                 {
-                    // Update position and save immediately
+                    // Update position immediately, but debounce disk writes while dragging.
                     currentFrame.X = win.Left;
                     currentFrame.Y = win.Top;
-                    FrameDataManager.SaveFrameData();
+                    if (!_framesBeingResized.Contains(frameId))
+                    {
+                        ScheduleFrameBoundsSave(frameId);
+                    }
                     LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameUpdate, $"Position updated for frame '{currentFrame.Title}' to X={win.Left}, Y={win.Top}");
                 }
                 else
@@ -7397,6 +7529,8 @@ namespace Desktop_Frames
                 }), System.Windows.Threading.DispatcherPriority.Loaded);
             }
             win.Show();
+            if (ShouldShowOnDesktop(win))
+                win.PinForShowDesktop();
 
 
 
@@ -9040,13 +9174,7 @@ namespace Desktop_Frames
                 {
                     try
                     {
-                        WrapPanel wrapPanel = FindVisualParent<WrapPanel>(sp);
-                        if (wrapPanel != null)
-                        {
-                            System.Windows.Point finalPosition = e.GetPosition(wrapPanel);
-                            IconDragDropManager.CompleteDrag(finalPosition);
-                        }
-                        else IconDragDropManager.CancelDrag();
+                        IconDragDropManager.CompleteDragAtScreenPosition(sp.PointToScreen(e.GetPosition(sp)));
                         e.Handled = true;
                     }
                     catch
@@ -9222,9 +9350,7 @@ namespace Desktop_Frames
             {
                 try
                 {
-                    var wrapPanel = FindVisualParent<WrapPanel>(sp);
-                    if (wrapPanel != null) IconDragDropManager.CompleteDrag(e.GetPosition(wrapPanel));
-                    else IconDragDropManager.CancelDrag();
+                    IconDragDropManager.CompleteDragAtScreenPosition(sp.PointToScreen(e.GetPosition(sp)));
                     e.Handled = true;
                 }
                 catch { IconDragDropManager.CancelDrag(); }
@@ -9984,6 +10110,12 @@ namespace Desktop_Frames
 
         public static void OnResizingStarted(NonActivatingWindow frame)
         {
+            string frameId = frame?.Tag?.ToString();
+            if (!string.IsNullOrEmpty(frameId))
+            {
+                _framesBeingResized.Add(frameId);
+            }
+
             if (SettingsManager.EnableDimensionSnap)
             {
                 frame.SizeChanged += UpdateSizeFeedback;
@@ -9993,6 +10125,8 @@ namespace Desktop_Frames
 
         public static void OnResizingEnded(NonActivatingWindow frame)
         {
+            string frameId = frame?.Tag?.ToString();
+
             if (SettingsManager.EnableDimensionSnap)
             {
                 frame.SizeChanged -= UpdateSizeFeedback;
@@ -10003,16 +10137,21 @@ namespace Desktop_Frames
                 frame.Width = snappedWidth;
                 frame.Height = snappedHeight;
 
-                dynamic FrameData = GetFrameData().FirstOrDefault(f => f.Title == frame.Title);
+                dynamic FrameData = GetFrameData().FirstOrDefault(f => f.Id?.ToString() == frameId);
                 if (FrameData != null)
                 {
                     FrameData.Width = snappedWidth;
                     FrameData.Height = snappedHeight;
-                    FrameDataManager.SaveFrameData();
                 }
 
                 // Show one last time. The unified timer in ShowSizeFeedback will clean it up automatically.
                 ShowSizeFeedback(snappedWidth, snappedHeight);
+            }
+
+            if (!string.IsNullOrEmpty(frameId))
+            {
+                _framesBeingResized.Remove(frameId);
+                SaveFrameBoundsNow(frameId);
             }
         }
 
