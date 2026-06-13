@@ -9074,6 +9074,9 @@ namespace Desktop_Frames
             }
 
             // --- NAMED LOCAL FUNCTIONS FOR EVENTS ---
+            bool pendingLaunch = false;
+            System.Windows.Point dragStart = default;
+
             void MouseDownHandler(object sender, MouseButtonEventArgs e)
             {
                 if (e.ChangedButton != MouseButton.Left) return;
@@ -9121,6 +9124,13 @@ namespace Desktop_Frames
                     return;
                 }
 
+                pendingLaunch = true;
+                dragStart = e.GetPosition(sp);
+                try { sp.CaptureMouse(); } catch { }
+            }
+
+            void TryLaunch(MouseButtonEventArgs e)
+            {
                 bool singleClickToLaunch = SettingsManager.SingleClickToLaunch;
 
                 try
@@ -9192,6 +9202,25 @@ namespace Desktop_Frames
                     }
                     catch { }
                 }
+                else if (pendingLaunch && e.LeftButton == MouseButtonState.Pressed)
+                {
+                    System.Windows.Point current = e.GetPosition(sp);
+                    if (Math.Abs(current.X - dragStart.X) >= SystemParameters.MinimumHorizontalDragDistance
+                        || Math.Abs(current.Y - dragStart.Y) >= SystemParameters.MinimumVerticalDragDistance)
+                    {
+                        IconDragDropManager.StartIconDrag(sp, dragStart);
+                        if (IconDragDropManager.IsDragging)
+                        {
+                            pendingLaunch = false;
+                            try
+                            {
+                                IconDragDropManager.HandleDragMove(sp.PointToScreen(current));
+                            }
+                            catch { }
+                            e.Handled = true;
+                        }
+                    }
+                }
             }
 
             void MouseUpHandler(object sender, MouseButtonEventArgs e)
@@ -9207,6 +9236,17 @@ namespace Desktop_Frames
                     {
                         IconDragDropManager.CancelDrag();
                     }
+                    finally
+                    {
+                        pendingLaunch = false;
+                        if (sp.IsMouseCaptured) sp.ReleaseMouseCapture();
+                    }
+                }
+                else if (pendingLaunch)
+                {
+                    pendingLaunch = false;
+                    if (sp.IsMouseCaptured) sp.ReleaseMouseCapture();
+                    TryLaunch(e);
                 }
             }
 
