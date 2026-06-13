@@ -28,9 +28,8 @@ namespace Desktop_Frames
 
         static LogManager()
         {
-            _logFilePath = System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location),
-                "Desktop_Frames.log");
+            System.IO.Directory.CreateDirectory(ProfileManager.AppDataDir);
+            _logFilePath = System.IO.Path.Combine(ProfileManager.AppDataDir, "Desktop_Frames.log");
         }
 
         public static void Log(LogLevel level, LogCategory category, string message)

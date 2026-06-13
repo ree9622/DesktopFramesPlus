@@ -138,8 +138,7 @@ namespace Desktop_Frames
                     $"Copying item: {displayName} from {filePath}");
 
                 // Set up copy folder path - similar to BackupManager._lastDeletedFolderPath pattern
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                _copiedItemFolderPath = Path.Combine(exeDir, "CopiedItem");
+                _copiedItemFolderPath = ProfileManager.GetProfileFilePath("CopiedItem");
 
                 // Ensure the copy folder exists - BackupManager pattern
                 if (!Directory.Exists(_copiedItemFolderPath))
@@ -243,8 +242,7 @@ namespace Desktop_Frames
                     Path.GetFileNameWithoutExtension(originalFileName);
 
                 // Generate unique filename for the new shortcut
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                string shortcutsDir = Path.Combine(exeDir, "Shortcuts");
+                string shortcutsDir = ProfileManager.GetProfileFilePath("Shortcuts");
 
                 if (!Directory.Exists(shortcutsDir))
                 {
@@ -370,8 +368,7 @@ namespace Desktop_Frames
         {
             try
             {
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                _copiedItemFolderPath = Path.Combine(exeDir, "CopiedItem");
+                _copiedItemFolderPath = ProfileManager.GetProfileFilePath("CopiedItem");
 
                 if (Directory.Exists(_copiedItemFolderPath))
                 {
@@ -421,8 +418,7 @@ namespace Desktop_Frames
                 }
 
                 // Verify files still exist - BackupManager validation pattern
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                string copiedItemPath = Path.Combine(exeDir, "CopiedItem");
+                string copiedItemPath = ProfileManager.GetProfileFilePath("CopiedItem");
                 string jsonPath = Path.Combine(copiedItemPath, "CopiedItem.json");
 
                 bool folderExists = Directory.Exists(copiedItemPath);

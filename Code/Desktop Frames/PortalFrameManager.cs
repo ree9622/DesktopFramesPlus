@@ -14,6 +14,8 @@ namespace Desktop_Frames
 {
     public class PortalFramemanager
     {
+        private static string T(string text) => LocalizationManager.T(text);
+
         // New field for the active filter
         private string _currentFilter = null;
         private int _sortMode = 0; // 0=Name, 1=Date Modified, 2=Type, 3=Size
@@ -483,7 +485,7 @@ namespace Desktop_Frames
                 ContextMenu contextMenu = new ContextMenu();
 
                 // 1. Copy Item (File Object)
-                MenuItem copyFileItem = new MenuItem { Header = "Copy Item" };
+                MenuItem copyFileItem = new MenuItem { Header = T("Copy Item") };
                 copyFileItem.Click += (s, e) =>
                 {
                     try
@@ -502,7 +504,7 @@ namespace Desktop_Frames
                 contextMenu.Items.Add(copyFileItem);
 
                 // 2. Cut Item (File Object with Move Effect)
-                MenuItem cutFileItem = new MenuItem { Header = "Cut Item" };
+                MenuItem cutFileItem = new MenuItem { Header = T("Cut Item") };
                 cutFileItem.Click += (s, e) =>
                 {
                     try
@@ -531,12 +533,12 @@ namespace Desktop_Frames
                 contextMenu.Items.Add(cutFileItem);
 
                 // 3. Rename item (Existing)
-                MenuItem renameItem = new MenuItem { Header = "Rename item" };
+                MenuItem renameItem = new MenuItem { Header = T("Rename item") };
                 renameItem.Click += (s, e) => RenameItem(path, sp);
                 contextMenu.Items.Add(renameItem);
 
                 // 4. Delete item (Existing)
-                MenuItem deleteItem = new MenuItem { Header = "Delete item" };
+                MenuItem deleteItem = new MenuItem { Header = T("Delete item") };
                 deleteItem.Click += (s, e) => DeleteItem(path, sp);
                 contextMenu.Items.Add(deleteItem);
 
@@ -544,7 +546,7 @@ namespace Desktop_Frames
                 contextMenu.Items.Add(new Separator());
 
                 // 6. Copy path (Existing - Moved to bottom)
-                MenuItem copyPathItem = new MenuItem { Header = "Copy path" };
+                MenuItem copyPathItem = new MenuItem { Header = T("Copy path") };
                 copyPathItem.Click += (s, e) => CopyPathOrTarget(path);
                 contextMenu.Items.Add(copyPathItem);
 

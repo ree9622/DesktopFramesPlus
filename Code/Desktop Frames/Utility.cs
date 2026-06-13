@@ -547,9 +547,7 @@ namespace Desktop_Frames
                 // 1. PATH CORRECTION
                 if (!System.IO.Path.IsPathRooted(path))
                 {
-                    string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                    // If path is relative, assume it's in the Shortcuts folder relative to EXE
-                    string checkPath = System.IO.Path.Combine(exeDir, path);
+                    string checkPath = ProfileManager.GetProfileFilePath(path);
                     if (System.IO.File.Exists(checkPath)) path = checkPath;
                 }
 
@@ -643,7 +641,6 @@ namespace Desktop_Frames
 
        
     }
-
 
 
 

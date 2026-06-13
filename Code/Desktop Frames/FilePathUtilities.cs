@@ -14,6 +14,15 @@ namespace Desktop_Frames
     /// </summary>
     public static class FilePathUtilities
     {
+        private static string ResolveProfileRelativePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path)) return path;
+
+            string profilePath = ProfileManager.GetProfileFilePath(path);
+            return System.IO.File.Exists(profilePath) || Directory.Exists(profilePath)
+                ? profilePath
+                : path;
+        }
 
         #region Unicode Shortcut Resolution - Used by: Framemanager (UpdateIcon, ClickEventAdder, LaunchItem)
         /// <summary>
@@ -27,6 +36,8 @@ namespace Desktop_Frames
         {
             try
             {
+                shortcutPath = ResolveProfileRelativePath(shortcutPath);
+
                 if (SettingsManager.EnableBackgroundValidationLogging)
                 {
                     LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.IconHandling,
@@ -426,8 +437,7 @@ namespace Desktop_Frames
             try
             {
                 // Delete main shortcut file (same logic as manual Remove)
-                string exeDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-                string shortcutPath = System.IO.Path.Combine(exeDir, "Shortcuts", System.IO.Path.GetFileName(filename));
+                string shortcutPath = ProfileManager.GetProfileFilePath(System.IO.Path.Combine("Shortcuts", System.IO.Path.GetFileName(filename)));
 
                 if (System.IO.File.Exists(shortcutPath))
                 {
@@ -445,7 +455,7 @@ namespace Desktop_Frames
                 }
 
                 // Delete backup shortcut if it exists (same logic as manual Remove)
-                string tempShortcutsDir = System.IO.Path.Combine(exeDir, "Temp Shortcuts");
+                string tempShortcutsDir = ProfileManager.GetProfileFilePath("Temp Shortcuts");
                 string backupPath = System.IO.Path.Combine(tempShortcutsDir, System.IO.Path.GetFileName(filename));
 
                 if (System.IO.File.Exists(backupPath))

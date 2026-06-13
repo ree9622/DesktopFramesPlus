@@ -182,6 +182,12 @@ namespace Desktop_Frames
 
         protected override void OnExit(ExitEventArgs e)
         {
+            try
+            {
+                DesktopItemLifecycleManager.RestoreAllProfilesToDesktop();
+            }
+            catch { }
+
             InterCore.Cleanup();
             try
             {

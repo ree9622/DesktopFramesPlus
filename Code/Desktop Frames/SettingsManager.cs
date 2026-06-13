@@ -54,6 +54,7 @@ namespace Desktop_Frames
         public static bool SuppressLaunchWarnings { get; set; } = false;
         public static bool DisableFrameScrollbars { get; set; } = false;
         public static bool DisableNoteAutoSave { get; set; } = false;
+        public static string Language { get; set; } = "Auto";
 
         public static bool EnableChameleonMode { get; set; } = false;
         public static bool EnableProfileAutomation { get; set; } = false;
@@ -91,7 +92,7 @@ namespace Desktop_Frames
         public static int AutoRollTime { get; set; } = 2;
         public static IconVisibilityEffect IconVisibilityEffect { get; set; } = IconVisibilityEffect.None;
         public static bool ExportShortcutsOnFrameDeletion { get; set; } = false;
-        public static bool DeleteOriginalShortcutsOnDrop { get; set; } = false;
+        public static bool DeleteOriginalShortcutsOnDrop { get; set; } = true;
         public static bool EnableSpotSearchHotkey { get; set; } = true;
 
         public static bool EnableProfileHotkeys { get; set; } = false;
@@ -119,8 +120,7 @@ namespace Desktop_Frames
         public static void LoadSettings()
         {
             // 1. DETERMINE SOURCE
-            string appRoot = AppDomain.CurrentDomain.BaseDirectory;
-            string masterPath = Path.Combine(appRoot, "MasterOptions.json");
+            string masterPath = ProfileManager.GetDataFilePath("MasterOptions.json");
             string localPath = ProfileManager.GetProfileFilePath("options.json");
 
             if (File.Exists(masterPath))
@@ -218,6 +218,7 @@ namespace Desktop_Frames
                 DisableSingleInstance,
                 DisableFrameScrollbars,
                 DisableNoteAutoSave,
+                Language,
                 ExportShortcutsOnFrameDeletion,
                 DeleteOriginalShortcutsOnDrop,
                 EnableSpotSearchHotkey,
@@ -311,8 +312,9 @@ namespace Desktop_Frames
             try { EnableIconGlowEffect = data.EnableIconGlowEffect ?? true; } catch { EnableIconGlowEffect = true; }
             try { DisableFrameScrollbars = data.DisableFrameScrollbars ?? false; } catch { DisableFrameScrollbars = false; }
             try { DisableNoteAutoSave = data.DisableNoteAutoSave ?? false; } catch { DisableNoteAutoSave = false; }
+            try { Language = NormalizeLanguage(data.Language?.ToString()); } catch { Language = "Auto"; }
             try { ExportShortcutsOnFrameDeletion = data.ExportShortcutsOnFrameDeletion ?? false; } catch { ExportShortcutsOnFrameDeletion = false; }
-            try { DeleteOriginalShortcutsOnDrop = data.DeleteOriginalShortcutsOnDrop ?? false; } catch { DeleteOriginalShortcutsOnDrop = false; }
+            try { DeleteOriginalShortcutsOnDrop = data.DeleteOriginalShortcutsOnDrop ?? true; } catch { DeleteOriginalShortcutsOnDrop = true; }
             try { EnableSpotSearchHotkey = data.EnableSpotSearchHotkey ?? true; } catch { EnableSpotSearchHotkey = true; }
             try { SpotSearchModifier = data.SpotSearchModifier?.ToString() ?? "Control"; } catch { SpotSearchModifier = "Control"; }
             try { ShowPortalExtensions = data.ShowPortalExtensions ?? false; } catch { ShowPortalExtensions = false; }
@@ -428,6 +430,16 @@ namespace Desktop_Frames
             return keyName switch { "~" => 192, "tilde" => 192, "space" => 32, "q" => 81, "f1" => 112, _ => 192 };
         }
 
+        private static string NormalizeLanguage(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "Auto";
+            string normalized = value.Trim();
+            if (normalized.Equals("English", StringComparison.OrdinalIgnoreCase)) return "English";
+            if (normalized.Equals("Korean", StringComparison.OrdinalIgnoreCase)) return "Korean";
+            if (normalized.Equals("한국어", StringComparison.OrdinalIgnoreCase)) return "Korean";
+            return "Auto";
+        }
+
         public static void SetMinLogLevel(LogManager.LogLevel level)
         {
             MinLogLevel = level;
@@ -482,8 +494,7 @@ namespace Desktop_Frames
         {
             try
             {
-                string appRoot = AppDomain.CurrentDomain.BaseDirectory;
-                string profilesDir = Path.Combine(appRoot, "Profiles");
+                string profilesDir = ProfileManager.ProfilesRootDir;
 
                 if (!Directory.Exists(profilesDir)) return;
 

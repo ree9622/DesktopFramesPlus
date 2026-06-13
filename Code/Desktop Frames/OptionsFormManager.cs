@@ -14,6 +14,9 @@ namespace Desktop_Frames
 {
     public static class OptionsFormManager
     {
+        private static string T(string text) => LocalizationManager.T(text);
+        private static string T(string format, params object[] args) => LocalizationManager.T(format, args);
+
         private static int _lastSelectedTabIndex = 0;
         private static TabControl _tabControl;
         private static Window _optionsWindow;
@@ -35,7 +38,7 @@ namespace Desktop_Frames
 
                 _optionsWindow = new Window
                 {
-                    Title = "Desktop Frames + Options",
+                    Title = T("Desktop Frames + Options"),
                     Width = 800,
                     Height = 850,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
@@ -77,7 +80,7 @@ namespace Desktop_Frames
 
                 TextBlock titleBlock = new TextBlock
                 {
-                    Text = "Options",
+                    Text = T("Options"),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 16,
                     FontWeight = FontWeights.Bold,
@@ -169,7 +172,8 @@ namespace Desktop_Frames
         {
             Button tabButton = new Button
             {
-                Content = title,
+                Content = T(title),
+                Tag = title,
                 Height = 40,
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 14,
@@ -200,7 +204,7 @@ namespace Desktop_Frames
             _lastSelectedTabIndex = tabIndex;
             _tabControl.SelectedIndex = tabIndex;
             StackPanel tabPanel = (StackPanel)selectedButton.Parent;
-            for (int i = 0; i < tabPanel.Children.Count; i++) if (tabPanel.Children[i] is Button btn) SetTabButtonColors(btn, btn.Content.ToString(), i == tabIndex);
+            for (int i = 0; i < tabPanel.Children.Count; i++) if (tabPanel.Children[i] is Button btn) SetTabButtonColors(btn, btn.Tag?.ToString() ?? btn.Content.ToString(), i == tabIndex);
         }
 
         // --- Tabs ---
@@ -209,6 +213,7 @@ namespace Desktop_Frames
             TabItem t = new TabItem();
             StackPanel c = new StackPanel();
             CreateSectionHeader(c, "Startup", _userAccentColor);
+            CreateLanguageSelector(c);
             CreateCheckBox(c, "Start with Windows", "StartWithWindows", TrayManager.IsStartWithWindows);
             CreateSectionHeader(c, "Selections", _userAccentColor);
             CreateCheckBox(c, "Single Click to Launch", "SingleClickToLaunch", SettingsManager.SingleClickToLaunch);
@@ -234,16 +239,16 @@ namespace Desktop_Frames
             soundGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
             soundGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
 
-            TextBlock lblSound = new TextBlock { Text = "Notification Sound:", FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+            TextBlock lblSound = new TextBlock { Text = T("Notification Sound:"), FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(lblSound, 0);
 
             ComboBox cbSoundType = new ComboBox { Name = "NotificationSoundComboBox", Height = 25, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
-            cbSoundType.Items.Add("Default Sound");
-            cbSoundType.Items.Add("Double Ding");
-            cbSoundType.Items.Add("Smooth Tickle");
-            cbSoundType.Items.Add("Message Ding");
-            cbSoundType.Items.Add("Gentle Ding");
-            cbSoundType.Items.Add("Soft Ding");
+            cbSoundType.Items.Add(T("Default Sound"));
+            cbSoundType.Items.Add(T("Double Ding"));
+            cbSoundType.Items.Add(T("Smooth Tickle"));
+            cbSoundType.Items.Add(T("Message Ding"));
+            cbSoundType.Items.Add(T("Gentle Ding"));
+            cbSoundType.Items.Add(T("Soft Ding"));
 
             // Map the current Enum back to the UI index
             cbSoundType.SelectedIndex = SettingsManager.NotificationSound switch
@@ -279,7 +284,7 @@ namespace Desktop_Frames
 
             // --- CHAMELEON TOGGLE ---
             var chamCb = CreateCheckBoxReturn(c, "Enable Chameleon Mode (Auto-match Wallpaper Color)", "EnableChameleon", SettingsManager.EnableChameleonMode);
-            chamCb.ToolTip = "Frames will automatically change color to blend perfectly with your desktop background.";
+            chamCb.ToolTip = T("Frames will automatically change color to blend perfectly with your desktop background.");
 
             CreateSliderControl(c, "Frame Tint", "TintSlider", SettingsManager.TintValue);
             CreateSliderControl(c, "Menu Tint", "MenuTintSlider", SettingsManager.MenuTintValue);
@@ -316,11 +321,11 @@ namespace Desktop_Frames
             iconGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             StackPanel menuIconPanel = new StackPanel();
-            menuIconPanel.Children.Add(new TextBlock { Text = "Menu Icon", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 0) });
+            menuIconPanel.Children.Add(new TextBlock { Text = T("Menu Icon"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 0) });
             CreateIconRadioButtonGroup(menuIconPanel, "MenuIconGroup", new Dictionary<string, int> { { "♥", 0 }, { "☰", 1 }, { "≣", 2 }, { "𓃑", 3 } }, SettingsManager.MenuIcon);
 
             StackPanel lockIconPanel = new StackPanel();
-            lockIconPanel.Children.Add(new TextBlock { Text = "Lock Icon", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 0) });
+            lockIconPanel.Children.Add(new TextBlock { Text = T("Lock Icon"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 0) });
             CreateIconRadioButtonGroup(lockIconPanel, "LockIconGroup", new Dictionary<string, int> { { "🛡️", 0 }, { "🔑", 1 }, { "🔐", 2 }, { "🔒", 3 } }, SettingsManager.LockIcon);
 
             Grid.SetColumn(menuIconPanel, 0);
@@ -514,7 +519,7 @@ namespace Desktop_Frames
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            TextBlock lbl = new TextBlock { Text = label, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+            TextBlock lbl = new TextBlock { Text = T(label), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(lbl, 0); g.Children.Add(lbl);
 
             StackPanel spMods = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -567,9 +572,9 @@ namespace Desktop_Frames
 
             // NEW: Live Rule Statistics (Horizontal Layout)
             StackPanel statsPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(15, 15, 0, 15) };
-            TextBlock txtTotalRules = new TextBlock { Text = $"Total number of rules: {AutoOrganizeManager.Rules.Count}", FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Medium };
+            TextBlock txtTotalRules = new TextBlock { Text = T("Total number of rules: {0}", AutoOrganizeManager.Rules.Count), FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Medium };
             TextBlock txtSeparator = new TextBlock { Text = "   -   ", FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Medium, Foreground = Brushes.Gray };
-            TextBlock txtEnabledRules = new TextBlock { Text = $"Enabled: {AutoOrganizeManager.Rules.Count(r => r.IsEnabled)}", FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34)) };
+            TextBlock txtEnabledRules = new TextBlock { Text = T("Enabled: {0}", AutoOrganizeManager.Rules.Count(r => r.IsEnabled)), FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34)) };
             statsPanel.Children.Add(txtTotalRules);
             statsPanel.Children.Add(txtSeparator);
             statsPanel.Children.Add(txtEnabledRules);
@@ -585,8 +590,8 @@ namespace Desktop_Frames
             {
                 new AutoOrganizeForm().ShowDialog();
                 // Refresh statistics when the editor closes
-                txtTotalRules.Text = $"Total number of rules: {AutoOrganizeManager.Rules.Count}";
-                txtEnabledRules.Text = $"Enabled: {AutoOrganizeManager.Rules.Count(r => r.IsEnabled)}";
+                txtTotalRules.Text = T("Total number of rules: {0}", AutoOrganizeManager.Rules.Count);
+                txtEnabledRules.Text = T("Enabled: {0}", AutoOrganizeManager.Rules.Count(r => r.IsEnabled));
             };
             c.Children.Add(btnManageRules);
 
@@ -598,7 +603,7 @@ namespace Desktop_Frames
             btnOrganizeNow.HorizontalAlignment = HorizontalAlignment.Left;
             btnOrganizeNow.Click += (s, e) =>
             {
-                if (MessageBoxesManager.ShowCustomYesNoMessageBox("This will move existing files on your desktop to your target folders based on your rules.\n\nProceed?", "Sweep Desktop"))
+                if (MessageBoxesManager.ShowCustomYesNoMessageBox(T("This will move existing files on your desktop to your target folders based on your rules.\n\nProceed?"), T("Sweep Desktop")))
                 {
                     AutoOrganizeManager.ProcessDesktopNow();
                 }
@@ -607,7 +612,7 @@ namespace Desktop_Frames
 
             TextBlock infoText = new TextBlock
             {
-                Text = "Note: Auto-Organize continuously monitors your Desktop for new files. When a file matches an enabled rule's conditions, it is automatically and physically moved to your target Portal Frame or Folder. Use this to keep your Desktop permanently clean and automatically route downloads to their proper locations.",
+                Text = T("Note: Auto-Organize continuously monitors your Desktop for new files. When a file matches an enabled rule's conditions, it is automatically and physically moved to your target Portal Frame or Folder. Use this to keep your Desktop permanently clean and automatically route downloads to their proper locations."),
                 FontStyle = FontStyles.Italic,
                 Foreground = Brushes.Gray,
                 Margin = new Thickness(15, 20, 0, 0),
@@ -641,9 +646,24 @@ namespace Desktop_Frames
         }
 
         // --- Helpers ---
-        private static void CreateSectionHeader(StackPanel p, string t, Color c) => p.Children.Add(new TextBlock { Text = t, FontFamily = new FontFamily("Segoe UI"), FontSize = 16, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(c), Margin = new Thickness(0, 10, 0, 15) });
-        private static void CreateCheckBox(StackPanel p, string t, string n, bool c) => p.Children.Add(new CheckBox { Name = n, Content = t, IsChecked = c, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, Margin = new Thickness(15, 8, 0, 8) });
-        private static CheckBox CreateCheckBoxReturn(StackPanel p, string t, string n, bool c) { var cb = new CheckBox { Name = n, Content = t, IsChecked = c, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, Margin = new Thickness(15, 8, 0, 8) }; p.Children.Add(cb); return cb; }
+        private static void CreateSectionHeader(StackPanel p, string t, Color c) => p.Children.Add(new TextBlock { Text = T(t), FontFamily = new FontFamily("Segoe UI"), FontSize = 16, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(c), Margin = new Thickness(0, 10, 0, 15) });
+        private static void CreateCheckBox(StackPanel p, string t, string n, bool c) => p.Children.Add(new CheckBox { Name = n, Content = T(t), IsChecked = c, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, Margin = new Thickness(15, 8, 0, 8) });
+        private static CheckBox CreateCheckBoxReturn(StackPanel p, string t, string n, bool c) { var cb = new CheckBox { Name = n, Content = T(t), IsChecked = c, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, Margin = new Thickness(15, 8, 0, 8) }; p.Children.Add(cb); return cb; }
+
+        private static void CreateLanguageSelector(StackPanel p)
+        {
+            Grid g = new Grid { Margin = new Thickness(15, 5, 0, 15) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
+            g.Children.Add(new TextBlock { Text = T("Language:"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+
+            ComboBox cb = new ComboBox { Name = "LanguageComboBox", Height = 25, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+            foreach (string language in new[] { "Auto", "English", "Korean" }) cb.Items.Add(language);
+            cb.SelectedItem = string.IsNullOrWhiteSpace(SettingsManager.Language) ? "Auto" : SettingsManager.Language;
+            Grid.SetColumn(cb, 1);
+            g.Children.Add(cb);
+            p.Children.Add(g);
+        }
 
         // FIX: Added 'max' parameter (defaulting to 100) to fix the Tint sliders while supporting AutoHideTime
         private static void CreateSliderControl(StackPanel p, string l, string n, int v, int max = 100)
@@ -657,7 +677,7 @@ namespace Desktop_Frames
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(65) });
 
             // UI FIX: Changed HorizontalAlignment to Left so labels sit flush on the left margin
-            TextBlock lbl = new TextBlock { Text = l, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 10, 0) };
+            TextBlock lbl = new TextBlock { Text = T(l), FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 10, 0) };
             Slider sl = new Slider { Name = n, Minimum = 1, Maximum = max, Value = v, TickFrequency = 1, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
 
             // --- TRIAL: Replaced TextBlock with interconnected NumericTextBox for micro-adjustments ---
@@ -701,7 +721,7 @@ namespace Desktop_Frames
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
 
-            TextBlock lblColor = new TextBlock { Text = "Color", FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 10, 0) };
+            TextBlock lblColor = new TextBlock { Text = T("Color"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 10, 0) };
             // Constrain Width to 140 and Left-align so it doesn't stretch to fill the 160px column, creating the gap automatically
             ComboBox cbColor = new ComboBox { Name = "ColorComboBox", Width = 140, HorizontalAlignment = HorizontalAlignment.Left, Height = 25, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             foreach (string c in new[] { "Gray", "Black", "White", "Beige", "Green", "Purple", "Fuchsia", "Yellow", "Orange", "Red", "Blue", "Bismark" }) cbColor.Items.Add(c);
@@ -713,7 +733,7 @@ namespace Desktop_Frames
             // ---------------------------------------------------------------
 
             // UI FIX: Starts perfectly flush at the new 205px mark
-            TextBlock lblEffect = new TextBlock { Text = "Effect", FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 10, 0) };
+            TextBlock lblEffect = new TextBlock { Text = T("Effect"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 10, 0) };
             ComboBox cbEffect = new ComboBox { Name = "LaunchEffectComboBox", Width = 140, HorizontalAlignment = HorizontalAlignment.Left, Height = 25, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             foreach (string e in new[] { "Zoom", "Bounce", "FadeOut", "SlideUp", "Rotate", "Agitate", "GrowAndFly", "Pulse", "Elastic", "Flip3D", "Spiral", "Shockwave", "Matrix", "Supernova", "Teleport" }) cbEffect.Items.Add(e);
             cbEffect.SelectedIndex = (int)SettingsManager.LaunchEffect;
@@ -726,14 +746,14 @@ namespace Desktop_Frames
             p.Children.Add(g);
         }
 
-        private static Button CreateStyledButton(string t, Color c) => new Button { Content = t, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Bold, Background = new SolidColorBrush(c), Foreground = Brushes.White, BorderThickness = new Thickness(0), Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+        private static Button CreateStyledButton(string t, Color c) => new Button { Content = T(t), FontFamily = new FontFamily("Segoe UI"), FontSize = 13, FontWeight = FontWeights.Bold, Background = new SolidColorBrush(c), Foreground = Brushes.White, BorderThickness = new Thickness(0), Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
 
         private static void CreateLogLevelComboBox(StackPanel p)
         {
             Grid g = new Grid { Margin = new Thickness(0, 10, 0, 10) };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-            g.Children.Add(new TextBlock { Text = "Minimum Log Level", FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            g.Children.Add(new TextBlock { Text = T("Minimum Log Level"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
             ComboBox cb = new ComboBox { Name = "LogLevelComboBox", Height = 25, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             foreach (var l in new[] { "Debug", "Info", "Warn", "Error" }) cb.Items.Add(l);
             cb.SelectedItem = SettingsManager.MinLogLevel.ToString();
@@ -775,6 +795,7 @@ namespace Desktop_Frames
                 bool tempPortalImageState = SettingsManager.ShowBackgroundImageOnPortalFrames;
                 bool newPortalWatermarkState = false;
                 bool newShowInTrayState = false;
+                string previousLanguage = SettingsManager.Language;
 
                 // 1. General
                 var generalContent = (StackPanel)((ScrollViewer)((TabItem)_tabControl.Items[0]).Content).Content;
@@ -814,6 +835,12 @@ namespace Desktop_Frames
                     // --- NEW: Catch the Sound Config Grid ---
                     else if (child is Grid genGrid)
                     {
+                        var languageCombo = genGrid.Children.OfType<ComboBox>().FirstOrDefault(c => c.Name == "LanguageComboBox");
+                        if (languageCombo?.SelectedItem != null)
+                        {
+                            SettingsManager.Language = languageCombo.SelectedItem.ToString();
+                        }
+
                         var sndCombo = genGrid.Children.OfType<ComboBox>().FirstOrDefault(c => c.Name == "NotificationSoundComboBox");
                         if (sndCombo != null)
                         {
@@ -1018,6 +1045,13 @@ namespace Desktop_Frames
                 SettingsManager.SetEnabledLogCategories(newEnabledCategories);
                 LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.Settings, "Options saved successfully");
 
+                if (!string.Equals(previousLanguage, SettingsManager.Language, StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBoxesManager.ShowOKOnlyMessageBoxForm(
+                        T("Language setting saved. Restart Desktop Frames to apply it everywhere."),
+                        T("Restart Required"));
+                }
+
                 if (tempPortalImageState != newPortalWatermarkState) TrayManager.reloadallFrames();
                 TrayManager.Instance?.UpdateTrayIcon();
                 Utility.UpdateFrameVisuals();
@@ -1050,10 +1084,10 @@ namespace Desktop_Frames
             Grid.SetRow(f, 2);
             StackPanel sp = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
 
-            Button c = new Button { Content = "Cancel", Width = 100, Height = 34, FontWeight = FontWeights.Bold, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(218, 220, 224)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 10, 0), Cursor = Cursors.Hand };
+            Button c = new Button { Content = T("Cancel"), Width = 100, Height = 34, FontWeight = FontWeights.Bold, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(218, 220, 224)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 10, 0), Cursor = Cursors.Hand };
             c.Click += (s, e) => _optionsWindow.Close();
 
-            Button sv = new Button { Content = "Save", Width = 100, Height = 34, FontWeight = FontWeights.Bold, Background = new SolidColorBrush(_userAccentColor), Foreground = Brushes.White, BorderThickness = new Thickness(0), Cursor = Cursors.Hand };
+            Button sv = new Button { Content = T("Save"), Width = 100, Height = 34, FontWeight = FontWeights.Bold, Background = new SolidColorBrush(_userAccentColor), Foreground = Brushes.White, BorderThickness = new Thickness(0), Cursor = Cursors.Hand };
             sv.Click += (s, e) => SaveOptions();
 
             sp.Children.Add(c); sp.Children.Add(sv); f.Child = sp; mainGrid.Children.Add(f);
@@ -1103,7 +1137,7 @@ namespace Desktop_Frames
         {
             try
             {
-                string p = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "Desktop_Frames.log");
+                string p = ProfileManager.GetDataFilePath("Desktop_Frames.log");
                 if (System.IO.File.Exists(p)) Process.Start(new ProcessStartInfo { FileName = p, UseShellExecute = true });
                 else MessageBoxesManager.ShowOKOnlyMessageBoxForm("Log file not found.", "Information");
             }

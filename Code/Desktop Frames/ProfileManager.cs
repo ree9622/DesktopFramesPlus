@@ -32,6 +32,7 @@ namespace Desktop_Frames
         public static void SetManualBaseProfile(string name) => _manualBaseProfile = name;
 
         private static string _appBaseDir;
+        private static string _legacyAppBaseDir;
         private static string _profilesRootDir;
         private static string _currentProfileName = "Default";
 
@@ -50,9 +51,11 @@ namespace Desktop_Frames
 
         // Profile Specific Files/Folders to Migrate
         private static readonly string[] FILES_TO_MOVE = { "frames.json", "fences.json", "options.json" };
-        private static readonly string[] FOLDERS_TO_MOVE = { "Shortcuts", "Temp Shortcuts", "Last Fence Deleted", "CopiedItem", "Backups" };
+        private static readonly string[] FOLDERS_TO_MOVE = { "Shortcuts", "Temp Shortcuts", "Last Fence Deleted", "Last Frame Deleted", "CopiedItem", "Backups", "Stored Desktop Items" };
 
         public static string CurrentProfileName => _currentProfileName;
+        public static string AppDataDir => _appBaseDir;
+        public static string ProfilesRootDir => _profilesRootDir;
 
         public static string CurrentProfileDir
         {
@@ -66,7 +69,12 @@ namespace Desktop_Frames
 
         static ProfileManager()
         {
-            _appBaseDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            string entryAssemblyPath = Assembly.GetEntryAssembly()?.Location ?? AppContext.BaseDirectory;
+            _legacyAppBaseDir = Path.GetDirectoryName(entryAssemblyPath) ?? AppContext.BaseDirectory;
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            _appBaseDir = string.IsNullOrWhiteSpace(localAppData)
+                ? _legacyAppBaseDir
+                : Path.Combine(localAppData, "DesktopFramesPlus");
             _profilesRootDir = Path.Combine(_appBaseDir, "Profiles");
         }
 
@@ -74,6 +82,9 @@ namespace Desktop_Frames
         {
             try
             {
+                if (!Directory.Exists(_appBaseDir)) Directory.CreateDirectory(_appBaseDir);
+                MigrateExecutableFolderDataToAppDataIfNeeded();
+
                 // 1. Check Migration
                 // ====================================================================
                 // [LEGACY "FENCES" MIGRATION - DO NOT REMOVE]
@@ -650,9 +661,181 @@ namespace Desktop_Frames
             }
         }
 
+        private static void MigrateExecutableFolderDataToAppDataIfNeeded()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_legacyAppBaseDir)) return;
+                if (string.Equals(
+                    Path.GetFullPath(_legacyAppBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    Path.GetFullPath(_appBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                bool appDataAlreadyHasProfiles = Directory.Exists(_profilesRootDir)
+                    && Directory.EnumerateFileSystemEntries(_profilesRootDir).Any();
+                bool appDataAlreadyHasConfig = File.Exists(Path.Combine(_appBaseDir, PROFILE_CONFIG_FILE));
+                bool legacyHasProfiles = Directory.Exists(Path.Combine(_legacyAppBaseDir, "Profiles"));
+                bool legacyHasConfig = File.Exists(Path.Combine(_legacyAppBaseDir, PROFILE_CONFIG_FILE));
+                bool legacyHasRootData = FILES_TO_MOVE.Any(file => File.Exists(Path.Combine(_legacyAppBaseDir, file)))
+                    || FOLDERS_TO_MOVE.Any(folder => Directory.Exists(Path.Combine(_legacyAppBaseDir, folder)));
+
+                if ((appDataAlreadyHasProfiles || appDataAlreadyHasConfig) || (!legacyHasProfiles && !legacyHasConfig && !legacyHasRootData))
+                {
+                    return;
+                }
+
+                string legacyProfilesDir = Path.Combine(_legacyAppBaseDir, "Profiles");
+                if (legacyHasProfiles)
+                {
+                    CopyDirectory(legacyProfilesDir, _profilesRootDir);
+                }
+
+                foreach (string file in new[] { PROFILE_CONFIG_FILE, MASTER_OPTIONS_FILE })
+                {
+                    string source = Path.Combine(_legacyAppBaseDir, file);
+                    string dest = Path.Combine(_appBaseDir, file);
+                    if (File.Exists(source) && !File.Exists(dest))
+                    {
+                        File.Copy(source, dest);
+                    }
+                }
+
+                foreach (string file in FILES_TO_MOVE)
+                {
+                    string source = Path.Combine(_legacyAppBaseDir, file);
+                    string dest = Path.Combine(_appBaseDir, file);
+                    if (File.Exists(source) && !File.Exists(dest))
+                    {
+                        File.Copy(source, dest);
+                    }
+                }
+
+                foreach (string folder in FOLDERS_TO_MOVE)
+                {
+                    string source = Path.Combine(_legacyAppBaseDir, folder);
+                    string dest = Path.Combine(_appBaseDir, folder);
+                    if (Directory.Exists(source) && !Directory.Exists(dest))
+                    {
+                        CopyDirectory(source, dest);
+                    }
+                }
+
+                RetargetMigratedShortcuts();
+
+                LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.General,
+                    $"Migrated executable-folder profile data to AppData: {_appBaseDir}");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Log(LogManager.LogLevel.Error, LogManager.LogCategory.General,
+                    $"Executable-folder data migration failed: {ex.Message}");
+            }
+        }
+
+        private static void RetargetMigratedShortcuts()
+        {
+            if (!Directory.Exists(_profilesRootDir)) return;
+
+            Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+
+            dynamic shell = Activator.CreateInstance(shellType);
+            foreach (string shortcutPath in Directory.GetFiles(_profilesRootDir, "*.lnk", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    dynamic shortcut = shell.CreateShortcut(shortcutPath);
+                    string targetPath = shortcut.TargetPath as string;
+                    string workingDirectory = shortcut.WorkingDirectory as string;
+                    string newTargetPath = RetargetLegacyPath(targetPath);
+                    string newWorkingDirectory = RetargetLegacyPath(workingDirectory);
+
+                    if (!string.Equals(targetPath, newTargetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        shortcut.TargetPath = newTargetPath;
+                        if (string.IsNullOrWhiteSpace(newWorkingDirectory) && !string.IsNullOrWhiteSpace(newTargetPath))
+                        {
+                            newWorkingDirectory = Path.GetDirectoryName(newTargetPath);
+                        }
+                    }
+
+                    if (!string.Equals(workingDirectory, newWorkingDirectory, StringComparison.OrdinalIgnoreCase))
+                    {
+                        shortcut.WorkingDirectory = newWorkingDirectory;
+                    }
+
+                    shortcut.Save();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.General,
+                        $"Shortcut retarget failed for {shortcutPath}: {ex.Message}");
+                }
+            }
+        }
+
+        private static string RetargetLegacyPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(_legacyAppBaseDir)) return path;
+
+            try
+            {
+                string legacyRoot = Path.GetFullPath(_legacyAppBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                string appDataRoot = Path.GetFullPath(_appBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                string fullPath = Path.GetFullPath(path);
+
+                if (fullPath.StartsWith(legacyRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Path.Combine(appDataRoot, fullPath.Substring(legacyRoot.Length));
+                }
+            }
+            catch
+            {
+                // Keep the original path if Windows cannot normalize it.
+            }
+
+            return path;
+        }
+
+        private static void CopyDirectory(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+
+            foreach (string file in Directory.GetFiles(sourceDir))
+            {
+                string dest = Path.Combine(destDir, Path.GetFileName(file));
+                if (!File.Exists(dest))
+                {
+                    File.Copy(file, dest);
+                }
+            }
+
+            foreach (string directory in Directory.GetDirectories(sourceDir))
+            {
+                CopyDirectory(directory, Path.Combine(destDir, Path.GetFileName(directory)));
+            }
+        }
+
         public static string GetProfileFilePath(string filename)
         {
             return Path.Combine(CurrentProfileDir, filename);
+        }
+
+        public static string GetDataFilePath(string filename)
+        {
+            return Path.Combine(_appBaseDir, filename);
+        }
+
+        public static string GetDataFolderPath(string folderName)
+        {
+            string path = Path.Combine(_appBaseDir, folderName);
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+            return path;
         }
 
         public static string GetMasterOptionsJson()

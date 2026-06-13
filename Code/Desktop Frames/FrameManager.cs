@@ -29,6 +29,8 @@ namespace Desktop_Frames
 {
     public static class Framemanager
     {
+        private static string T(string text) => LocalizationManager.T(text);
+        private static string T(string format, params object[] args) => LocalizationManager.T(format, args);
 
         // --- NEW: Centralized Presets ---
         private static readonly Dictionary<string, string> _standardPresets = new Dictionary<string, string>
@@ -584,7 +586,7 @@ namespace Desktop_Frames
                     Foreground = System.Windows.Media.Brushes.White,
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
-                    ToolTip = "Go Up"
+                    ToolTip = T("Go Up")
                 };
                 newBtnBack.Click += (s, e) =>
                 {
@@ -618,7 +620,7 @@ namespace Desktop_Frames
                     Foreground = System.Windows.Media.Brushes.Orange,
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
-                    ToolTip = "Set current view as the new Home for this frame"
+                    ToolTip = T("Set current view as the new Home for this frame")
                 };
                 newBtnSetBase.Click += (s, e) =>
                 {
@@ -1032,12 +1034,12 @@ namespace Desktop_Frames
             // ------------------------
 
             // About item
-            var aboutItem = new MenuItem { Header = "About..." };
+            var aboutItem = new MenuItem { Header = T("About...") };
             aboutItem.Click += (s, e) => AboutFormManager.ShowAboutForm();
             menu.Items.Add(aboutItem);
 
             // Options item
-            var optionsItem = new MenuItem { Header = "Options..." };
+            var optionsItem = new MenuItem { Header = T("Options...") };
             optionsItem.Click += (s, e) => OptionsFormManager.ShowOptionsForm();
             menu.Items.Add(optionsItem);
 
@@ -1045,7 +1047,7 @@ namespace Desktop_Frames
             menu.Items.Add(new Separator());
 
             // New frame items
-            var newFrameItem = new MenuItem { Header = "New Frame" };
+            var newFrameItem = new MenuItem { Header = T("New Frame") };
             newFrameItem.Click += (s, e) =>
             {
                 var mousePosition = System.Windows.Forms.Cursor.Position;
@@ -1053,7 +1055,7 @@ namespace Desktop_Frames
             };
             menu.Items.Add(newFrameItem);
 
-            var newPortalFrameItem = new MenuItem { Header = "New Portal Frame" };
+            var newPortalFrameItem = new MenuItem { Header = T("New Portal Frame") };
             newPortalFrameItem.Click += (s, e) =>
             {
                 var mousePosition = System.Windows.Forms.Cursor.Position;
@@ -1061,7 +1063,7 @@ namespace Desktop_Frames
             };
             menu.Items.Add(newPortalFrameItem);
 
-            MenuItem newNoteFrameItem = new MenuItem { Header = "New Note Frame" };
+            MenuItem newNoteFrameItem = new MenuItem { Header = T("New Note Frame") };
             newNoteFrameItem.Click += (s, e) =>
             {
                 var mousePosition = System.Windows.Forms.Cursor.Position;
@@ -1080,7 +1082,7 @@ namespace Desktop_Frames
 
                 var enableTabsItem = new MenuItem
                 {
-                    Header = "Enable Tabs On This Frame",
+                    Header = T("Enable Tabs On This Frame"),
                     IsCheckable = true,   // Shows checkbox gutter
                     IsChecked = tabsEnabled // Visual checkmark
                 };
@@ -1094,56 +1096,28 @@ namespace Desktop_Frames
 
             // --- REORDERED: Delete Option Second ---
             // Delete this frames
-            var deleteThisFrame = new MenuItem { Header = "Delete this Frame" };
+            var deleteThisFrame = new MenuItem { Header = T("Delete this Frame") };
             deleteThisFrame.Click += (s, e) =>
             {
-                bool result = MessageBoxesManager.ShowCustomMessageBoxForm();
-                if (result == true)
-                {
-                    if (SettingsManager.ExportShortcutsOnFrameDeletion && frame.ItemsType?.ToString() == "Data")
-                    {
-                        ExportAllIconsToDesktop(frame, false);
-                    }
-
-                    BackupManager.BackupDeletedFrame(frame);
-
-                    FrameDataManager.FrameData.Remove(frame);
-                    _heartTextBlocks.Remove(frame);
-
-                    // --- BUG FIX: Avoid JObject HashCode Mutation ---
-                    var targetPortal = _portalFrames.FirstOrDefault(kvp => kvp.Key?.Id?.ToString() == frame.Id?.ToString());
-                    if (targetPortal.Value != null)
-                    {
-                        targetPortal.Value.Dispose();
-                        _portalFrames.Remove(targetPortal.Key);
-                    }
-
-                    FrameDataManager.SaveFrameData();
-
-                    var windows = System.Windows.Application.Current.Windows.OfType<NonActivatingWindow>();
-                    var win = windows.FirstOrDefault(w => w.Tag?.ToString() == frame.Id?.ToString());
-                    if (win != null) win.Close();
-
-                    UpdateAllHeartContextMenus();
-                }
+                DeleteFrame(frame);
             };
             menu.Items.Add(deleteThisFrame);
 
             menu.Items.Add(new Separator());
 
             // Export/Import Group
-            var exportItem = new MenuItem { Header = "Export this Frame" };
+            var exportItem = new MenuItem { Header = T("Export this Frame") };
             exportItem.Click += (s, e) => BackupManager.ExportFrame(frame);
             menu.Items.Add(exportItem);
 
-            var importItem = new MenuItem { Header = "Import a Frame..." };
+            var importItem = new MenuItem { Header = T("Import a Frame...") };
             importItem.Click += (s, e) => BackupManager.ImportFrame();
             menu.Items.Add(importItem);
 
             // Restore frame item
             var restoreItem = new MenuItem
             {
-                Header = "Restore Last Deleted Frame",
+                Header = T("Restore Last Deleted Frame"),
                 Visibility = BackupManager.IsRestoreAvailable ? Visibility.Visible : Visibility.Collapsed
             };
             restoreItem.Click += (s, e) => BackupManager.RestoreLastDeletedFrame();
@@ -1153,7 +1127,7 @@ namespace Desktop_Frames
             menu.Items.Add(new Separator());
 
             // Exit item
-            var exitItem = new MenuItem { Header = "Exit" };
+            var exitItem = new MenuItem { Header = T("Exit") };
             exitItem.Click += (s, e) => System.Windows.Application.Current.Shutdown();
             menu.Items.Add(exitItem);
 
@@ -1216,9 +1190,9 @@ namespace Desktop_Frames
                 ContextMenu iconContextMenu = new ContextMenu();
 
                 // --- GROUP 1: MANIPULATION ---
-                MenuItem miEdit = new MenuItem { Header = "Edit..." };
-                MenuItem miMove = new MenuItem { Header = "Move..." };
-                MenuItem miRemove = new MenuItem { Header = "Remove" };
+            MenuItem miEdit = new MenuItem { Header = T("Edit...") };
+            MenuItem miMove = new MenuItem { Header = T("Move...") };
+            MenuItem miRemove = new MenuItem { Header = T("Remove") };
 
                 iconContextMenu.Items.Add(miEdit);
                 iconContextMenu.Items.Add(miMove);
@@ -1228,7 +1202,7 @@ namespace Desktop_Frames
 
                 // --- GROUP 2: CLIPBOARD ---
                 Separator sepClipboard = new Separator();
-                MenuItem miCopyItem = new MenuItem { Header = "Copy Item" };
+            MenuItem miCopyItem = new MenuItem { Header = T("Copy Item") };
 
                 iconContextMenu.Items.Add(sepClipboard);
                 iconContextMenu.Items.Add(miCopyItem);
@@ -1251,10 +1225,10 @@ namespace Desktop_Frames
                 {
                     iconContextMenu.Items.Add(new Separator());
 
-                    MenuItem miRunAsAdmin = new MenuItem { Header = "Run as administrator" };
+            MenuItem miRunAsAdmin = new MenuItem { Header = T("Run as administrator") };
                     miAlwaysAdmin = new MenuItem
                     {
-                        Header = "Always run as administrator",
+                Header = T("Always run as administrator"),
                         IsCheckable = true
                     };
 
@@ -1314,14 +1288,14 @@ namespace Desktop_Frames
                 Separator sepPath = new Separator();
                 iconContextMenu.Items.Add(sepPath);
 
-                MenuItem miCopyPathRoot = new MenuItem { Header = "Copy path" };
-                MenuItem miCopyFolder = new MenuItem { Header = "Folder path" };
-                MenuItem miCopyFullPath = new MenuItem { Header = "Full path" };
+            MenuItem miCopyPathRoot = new MenuItem { Header = T("Copy path") };
+            MenuItem miCopyFolder = new MenuItem { Header = T("Folder path") };
+            MenuItem miCopyFullPath = new MenuItem { Header = T("Full path") };
 
                 miCopyPathRoot.Items.Add(miCopyFolder);
                 miCopyPathRoot.Items.Add(miCopyFullPath);
 
-                MenuItem miFindTarget = new MenuItem { Header = "Open target folder..." };
+            MenuItem miFindTarget = new MenuItem { Header = T("Open target folder...") };
 
                 iconContextMenu.Items.Add(miCopyPathRoot);
                 iconContextMenu.Items.Add(miFindTarget);
@@ -1418,7 +1392,7 @@ namespace Desktop_Frames
                     // 1. Send to Desktop (Ctrl only, Skip for spacers)
                     if (isCtrl && !isSpacer)
                     {
-                        miSendToDesktop = new MenuItem { Header = "Send to Desktop" };
+                miSendToDesktop = new MenuItem { Header = T("Send to Desktop") };
                         miSendToDesktop.Click += (sender, args) => CopyPasteManager.SendToDesktop(item);
                         int idxCopy = iconContextMenu.Items.IndexOf(miCopyItem);
                         if (idxCopy != -1) iconContextMenu.Items.Insert(idxCopy + 1, miSendToDesktop);
@@ -1427,8 +1401,8 @@ namespace Desktop_Frames
                     // 2. Different User Options (Ctrl OR if setting is already checked)
                     if (isEligibleForAdmin && (isCtrl || isAlwaysDiffUser))
                     {
-                        miRunAsDifferentUser = new MenuItem { Header = "Run as different user..." };
-                        miAlwaysRunAsDifferentUser = new MenuItem { Header = "Always run as different user", IsCheckable = true };
+                miRunAsDifferentUser = new MenuItem { Header = T("Run as different user...") };
+                miAlwaysRunAsDifferentUser = new MenuItem { Header = T("Always run as different user"), IsCheckable = true };
 
                         miRunAsDifferentUser.Click += (sender, args) => {
                             string target = Utility.GetShortcutTarget(filePath);
@@ -1755,6 +1729,95 @@ namespace Desktop_Frames
                    validUri.Scheme != Uri.UriSchemeFile;
         }
 
+        private static bool IsFromDesktop(string path)
+        {
+            try
+            {
+                string itemDir = System.IO.Path.GetDirectoryName(path);
+                if (string.IsNullOrWhiteSpace(itemDir)) return false;
+
+                string userDesktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+
+                return string.Equals(itemDir, userDesktop, StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(itemDir, commonDesktop, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string MoveDesktopFileIntoProfileStorage(string desktopFile)
+        {
+            if (!System.IO.File.Exists(desktopFile) || !IsFromDesktop(desktopFile)) return desktopFile;
+
+            string storageDir = ProfileManager.GetProfileFilePath("Stored Desktop Items");
+            if (!System.IO.Directory.Exists(storageDir)) System.IO.Directory.CreateDirectory(storageDir);
+
+            string fileName = System.IO.Path.GetFileName(desktopFile);
+            string destination = System.IO.Path.Combine(storageDir, fileName);
+            int counter = 1;
+
+            while (System.IO.File.Exists(destination))
+            {
+                string name = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                string extension = System.IO.Path.GetExtension(fileName);
+                destination = System.IO.Path.Combine(storageDir, $"{name} ({counter++}){extension}");
+            }
+
+            System.IO.File.Move(desktopFile, destination);
+            return destination;
+        }
+
+        private static void RetargetShortcut(string shortcutPath, string targetPath, bool isFolder)
+        {
+            if (string.IsNullOrWhiteSpace(shortcutPath) || !System.IO.File.Exists(shortcutPath)) return;
+            if (!shortcutPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return;
+
+            WshShell shell = new WshShell();
+            IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = targetPath;
+            if (isFolder) shortcut.WorkingDirectory = targetPath;
+            else
+            {
+                string workingDirectory = System.IO.Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrWhiteSpace(workingDirectory)) shortcut.WorkingDirectory = workingDirectory;
+            }
+            shortcut.Save();
+        }
+
+        private static void DeleteFrame(dynamic frame)
+        {
+            bool result = MessageBoxesManager.ShowCustomMessageBoxForm();
+            if (result != true) return;
+
+            if (SettingsManager.ExportShortcutsOnFrameDeletion && frame.ItemsType?.ToString() == "Data")
+            {
+                ExportAllIconsToDesktop(frame, false);
+            }
+
+            BackupManager.BackupDeletedFrame(frame);
+
+            FrameDataManager.FrameData.Remove(frame);
+            _heartTextBlocks.Remove(frame);
+
+            var targetPortal = _portalFrames.FirstOrDefault(kvp => kvp.Key?.Id?.ToString() == frame.Id?.ToString());
+            if (targetPortal.Value != null)
+            {
+                targetPortal.Value.Dispose();
+                _portalFrames.Remove(targetPortal.Key);
+            }
+
+            FrameDataManager.SaveFrameData();
+
+            var windows = System.Windows.Application.Current.Windows.OfType<NonActivatingWindow>();
+            var win = windows.FirstOrDefault(w => w.Tag?.ToString() == frame.Id?.ToString());
+            if (win != null) win.Close();
+
+            UpdateAllHeartContextMenus();
+        }
+
 
 
         /// <summary>
@@ -1902,7 +1965,7 @@ namespace Desktop_Frames
             try
             {
                 ContextMenu iconContextMenu = new ContextMenu();
-                MenuItem miRemove = new MenuItem { Header = "Remove" };
+            MenuItem miRemove = new MenuItem { Header = T("Remove") };
 
         
                 miRemove.Click += (sender, e) =>
@@ -1944,7 +2007,7 @@ namespace Desktop_Frames
                 bool alwaysAdmin = Convert.ToBoolean(item["AlwaysRunAsAdmin"] ?? false);
                 MenuItem miAlwaysAdmin = new MenuItem
                 {
-                    Header = "Always run as administrator",
+                Header = T("Always run as administrator"),
                     IsCheckable = true,
                     IsChecked = alwaysAdmin
                 };
@@ -2711,11 +2774,11 @@ namespace Desktop_Frames
 
                     // Context Menu
                     ContextMenu tabContextMenu = new ContextMenu();
-                    MenuItem miAddTab = new MenuItem { Header = "Add New Tab" };
-                    MenuItem miRenameTab = new MenuItem { Header = "Rename Tab" };
-                    MenuItem miDeleteTab = new MenuItem { Header = "Delete Tab" };
-                    MenuItem miMoveLeft = new MenuItem { Header = "Move Left" };
-                    MenuItem miMoveRight = new MenuItem { Header = "Move Right" };
+            MenuItem miAddTab = new MenuItem { Header = T("Add New Tab") };
+            MenuItem miRenameTab = new MenuItem { Header = T("Rename Tab") };
+            MenuItem miDeleteTab = new MenuItem { Header = T("Delete Tab") };
+            MenuItem miMoveLeft = new MenuItem { Header = T("Move Left") };
+            MenuItem miMoveRight = new MenuItem { Header = T("Move Right") };
 
                     tabContextMenu.Items.Add(miAddTab);
                     tabContextMenu.Items.Add(new Separator());
@@ -2754,7 +2817,7 @@ namespace Desktop_Frames
                     FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
                     BorderThickness = new Thickness(1),
                     Cursor = Cursors.Hand,
-                    ToolTip = "Add new tab (Ctrl+Click to Import)", // Updated Tooltip
+                ToolTip = T("Add new tab (Ctrl+Click to Import)"), // Updated Tooltip
                     Focusable = false
                 };
 
@@ -3999,26 +4062,12 @@ namespace Desktop_Frames
             bool disableSingleInstance = SettingsManager.DisableSingleInstance;
             try
             {
-                string baseDir = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                string optionsPath = System.IO.Path.Combine(baseDir, "options.json"); // Legacy fallback
-                string masterOptionsPath = System.IO.Path.Combine(baseDir, "MasterOptions.json");
+                string optionsPath = ProfileManager.GetProfileFilePath("options.json");
+                string masterOptionsPath = ProfileManager.GetDataFilePath("MasterOptions.json");
 
                 if (System.IO.File.Exists(masterOptionsPath))
                 {
                     optionsPath = masterOptionsPath;
-                }
-                else
-                {
-                    string activeProfilePath = System.IO.Path.Combine(baseDir, "ActiveProfile.txt");
-                    if (System.IO.File.Exists(activeProfilePath))
-                    {
-                        string activeProfile = System.IO.File.ReadAllText(activeProfilePath).Trim();
-                        string profileOptionsPath = System.IO.Path.Combine(baseDir, "Profiles", activeProfile, "options.json");
-                        if (System.IO.File.Exists(profileOptionsPath))
-                        {
-                            optionsPath = profileOptionsPath;
-                        }
-                    }
                 }
 
                 if (System.IO.File.Exists(optionsPath))
@@ -4103,7 +4152,7 @@ namespace Desktop_Frames
             {
                 try
                 {
-                    string logPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "Desktop_Frames.log");
+                    string logPath = ProfileManager.GetDataFilePath("Desktop_Frames.log");
                     if (System.IO.File.Exists(logPath))
                     {
                         System.IO.File.Delete(logPath);
@@ -4184,6 +4233,10 @@ namespace Desktop_Frames
 
             // Clear any stuck transition states from previous session
             ClearAllTransitionStates();
+
+            // If Desktop-managed items were restored on the last app exit, collect them
+            // back into the active profile before building frame icons.
+            DesktopItemLifecycleManager.CollectCurrentProfileDesktopItems();
 
             // Start emergency cleanup timer if not already running
             if (_transitionCleanupTimer == null)
@@ -4409,17 +4462,18 @@ namespace Desktop_Frames
                     TextColor = "Teal",         // Teal text
 
                     // Note Settings
-                    NoteContent = "WELCOME TO DESKTOP FRAMES +\r\n" +
+                    NoteContent = T("WELCOME TO DESKTOP FRAMES +") + "\r\n" +
                                   "---------------------------\r\n" +
-                                  "• Roll Up/Down: Double-click the frame title bar.\r\n" +
-                                  "• Rename: Ctrl + Click the title bar (Enter to save).\r\n" +
-                                  "• Search (SpotSearch): Press Ctrl + ` (Tilde) to find any icon instantly.\r\n" +
-                                  "• Options: Click the '♥' menu icon (top-left).\r\n" +
-                                  "• Reorder Icons on a frame: Ctrl + Drag icon to new position.\r\n" +
-                                  "• Context Menu: Right-click icons or Frames for more options.\r\n" +
+                                  "• " + T("Roll Up/Down: Double-click the frame title bar.") + "\r\n" +
+                                  "• " + T("Rename: Click the frame name, then press Enter to save.") + "\r\n" +
+                                  "• " + T("Search (SpotSearch): Press Ctrl + ` (Tilde) to find any icon instantly.") + "\r\n" +
+                                  "• " + T("Options: Click the menu icon in the top-left.") + "\r\n" +
+                                  "• " + T("Delete a frame: Click the × button in the top-left or use the frame menu.") + "\r\n" +
+                                  "• " + T("Reorder Icons on a frame: Ctrl + Drag icon to new position.") + "\r\n" +
+                                  "• " + T("Context Menu: Right-click icons or Frames for more options.") + "\r\n" +
                                   " \r\n" +
-                                  "TIP: Ctrl + Click or Ctrl + Right-click, gives even more options.\r\n\r\n" +
-                                  "Try customizing this frame! Right-click the title bar -> Customize...",
+                                  T("TIP: Ctrl + Click or Ctrl + Right-click gives even more options.") + "\r\n\r\n" +
+                                  T("Try customizing this frame! Right-click the title bar -> Customize..."),
 
                     NoteFontSize = "Medium",
                     NoteFontFamily = "Segoe UI",
@@ -4478,6 +4532,7 @@ namespace Desktop_Frames
 
             // --- NEW: Declare Commit Action for robust saving ---
             Action CommitRename = null;
+            Action BeginRename = null;
             // ---------------------------------------------------
 
             // Check for valid Portal Frame target folder
@@ -4606,7 +4661,6 @@ namespace Desktop_Frames
             };
 
 
-            dp.Children.Add(heart);
             Panel.SetZIndex(heart, 100); // Ensure heart is above titleGrid to receive clicks
 
             // Store heart TextBlock reference for this frame
@@ -4649,6 +4703,56 @@ namespace Desktop_Frames
                     e.Handled = true;
                 }
             };
+
+            TextBlock closeIcon = new TextBlock
+            {
+                Name = "FrameCloseIcon",
+                Text = "×",
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                Foreground = System.Windows.Media.Brushes.White,
+                Margin = new Thickness(30, -2, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Cursor = Cursors.Hand,
+                ToolTip = T("Delete this frame"),
+                Opacity = (double)SettingsManager.MenuTintValue / 100
+            };
+
+            closeIcon.MouseEnter += (s, e) =>
+            {
+                closeIcon.BeginAnimation(UIElement.OpacityProperty, null);
+                closeIcon.Opacity = 1.0;
+            };
+
+            closeIcon.MouseLeave += (s, e) =>
+            {
+                double targetOpacity = (double)SettingsManager.MenuTintValue / 100;
+                DoubleAnimation fadeBack = new DoubleAnimation
+                {
+                    From = 1.0,
+                    To = targetOpacity,
+                    Duration = TimeSpan.FromMilliseconds(300),
+                    BeginTime = TimeSpan.FromMilliseconds(800)
+                };
+
+                closeIcon.BeginAnimation(UIElement.OpacityProperty, fadeBack);
+            };
+
+            closeIcon.MouseLeftButtonDown += (s, e) =>
+            {
+                if (titletb.IsVisible)
+                {
+                    CommitRename?.Invoke();
+                    return;
+                }
+
+                DeleteFrame(frame);
+                e.Handled = true;
+            };
+
+            Panel.SetZIndex(closeIcon, 101);
+
             // Add a protection symbol in top-right corner
 
 
@@ -4778,13 +4882,25 @@ namespace Desktop_Frames
             titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Col 1: Title
             titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                      // Col 2: Filter Icon (Auto width)
             titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30, GridUnitType.Pixel) }); // Col 3: Lock Icon
+            Grid.SetColumn(heart, 0);
+            Grid.SetColumnSpan(heart, 4);
+            titleGrid.Children.Add(heart);
+            Grid.SetColumn(closeIcon, 0);
+            Grid.SetColumnSpan(closeIcon, 4);
+            titleGrid.Children.Add(closeIcon);
                                                                                                                       // End of ctrl+click handler
             ContextMenu CnMnFramemanager = new ContextMenu();
+            titleGrid.PreviewMouseRightButtonDown += (s, e) =>
+            {
+                CnMnFramemanager.PlacementTarget = titleGrid;
+                CnMnFramemanager.IsOpen = true;
+                e.Handled = true;
+            };
         
-            MenuItem miNewnoteFrame = new MenuItem { Header = "New Note Frame" };
+            MenuItem miNewnoteFrame = new MenuItem { Header = T("New Note Frame") };
         
             // --- NEW: Auto Roll Menu Item ---
-            MenuItem miAutoRoll = new MenuItem { Header = "Auto roll", IsCheckable = true };
+            MenuItem miAutoRoll = new MenuItem { Header = T("Auto roll"), IsCheckable = true };
             miAutoRoll.IsChecked = frame.AutoRoll?.ToString().ToLower() == "true";
             miAutoRoll.Click += (s, e) =>
             {
@@ -4806,7 +4922,7 @@ namespace Desktop_Frames
             CnMnFramemanager.Items.Add(miAutoRoll);
 
             // --- NEW: Always On Top Menu Item ---
-            MenuItem miAlwaysOnTop = new MenuItem { Header = "Always on top", IsCheckable = true };
+            MenuItem miAlwaysOnTop = new MenuItem { Header = T("Always on top"), IsCheckable = true };
             miAlwaysOnTop.IsChecked = frame.AlwaysOnTop?.ToString().ToLower() == "true";
             miAlwaysOnTop.Click += (s, e) =>
             {
@@ -4817,7 +4933,7 @@ namespace Desktop_Frames
             CnMnFramemanager.Items.Add(new Separator());
             // --------------------------------
 
-            MenuItem miHide = new MenuItem { Header = "Hide Frame" }; // New Hide Frame item
+            MenuItem miHide = new MenuItem { Header = T("Hide Frame") }; // New Hide Frame item
                                                                    
             CnMnFramemanager.Items.Add(miHide); // Add Hide Frame
                                                 // Add Note Frame specific context menu items if this is a Note Frame
@@ -4854,7 +4970,7 @@ namespace Desktop_Frames
                 // We'll modify the context menu after InitContent() is called
             }
             //Peek behind frame
-            MenuItem miPeekBehind = new MenuItem { Header = "Peek Behind" };
+            MenuItem miPeekBehind = new MenuItem { Header = T("Peek Behind") };
             CnMnFramemanager.Items.Add(miPeekBehind);
             miPeekBehind.Click += (s, e) =>
             {
@@ -4933,7 +5049,7 @@ namespace Desktop_Frames
                 sepClearDead = new Separator { Visibility = Visibility.Collapsed };
                 CnMnFramemanager.Items.Add(sepClearDead);
 
-                miClearDeadShortcuts = new MenuItem { Header = "Clear Dead Shortcuts", Visibility = Visibility.Collapsed };
+                miClearDeadShortcuts = new MenuItem { Header = T("Clear Dead Shortcuts"), Visibility = Visibility.Collapsed };
                 CnMnFramemanager.Items.Add(miClearDeadShortcuts);
 
                 miClearDeadShortcuts.Click += (s, e) =>
@@ -4963,7 +5079,7 @@ namespace Desktop_Frames
             // 2. Open Folder (Portal Only)
             if (frame.ItemsType?.ToString() == "Portal")
             {
-                MenuItem miOpenFolder = new MenuItem { Header = "Open frame folder" };
+                MenuItem miOpenFolder = new MenuItem { Header = T("Open frame folder") };
                 miOpenFolder.Click += (s, e) =>
                 {
                     try
@@ -4980,7 +5096,7 @@ namespace Desktop_Frames
             CnMnFramemanager.Items.Add(new Separator());
 
             // 3. Paste Item (Initially Hidden)
-            MenuItem miPasteItem = new MenuItem { Header = "Paste Item", Visibility = Visibility.Collapsed };
+            MenuItem miPasteItem = new MenuItem { Header = T("Paste Item"), Visibility = Visibility.Collapsed };
             miPasteItem.Click += (s, e) => CopyPasteManager.PasteItem(frame);
             CnMnFramemanager.Items.Add(miPasteItem);
 
@@ -4990,7 +5106,7 @@ namespace Desktop_Frames
             //  CnMnFramemanager.Items.Add(new Separator());
 
             //CnMnFramemanager.Items.Add(miNewCustomize);
-            MenuItem miCustomize = new MenuItem { Header = "Customize..." };
+            MenuItem miCustomize = new MenuItem { Header = T("Customize...") };
             miCustomize.Click += (s, e) =>
             {
                 try
@@ -5536,7 +5652,7 @@ namespace Desktop_Frames
                 Foreground = titleTextBrush, // Changed from hardcoded White
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Cursor = Cursors.SizeAll,
+                Cursor = Cursors.IBeam,
                 FontWeight = isBoldTitle ? FontWeights.Bold : FontWeights.Normal,
                 FontSize = titleFontSize // Apply custom title text size
             };
@@ -5592,13 +5708,13 @@ namespace Desktop_Frames
                 // C. Export All & Spacer Menu (Data Frame + Ctrl)
                 if (isCtrlPressed && isDataFrame)
                 {
-                    miExportAllToDesktop = new MenuItem { Header = "Export all icons to desktop" };
+                    miExportAllToDesktop = new MenuItem { Header = T("Export all icons to desktop") };
                     miExportAllToDesktop.Click += (s, e) => ExportAllIconsToDesktop(frame);
 
-                    miAddSpacerMenu = new MenuItem { Header = "Add spacer" };
+                    miAddSpacerMenu = new MenuItem { Header = T("Add spacer") };
 
-                    MenuItem miSpacerBlank = new MenuItem { Header = "Blank" };
-                    MenuItem miSpacerDot = new MenuItem { Header = "Dot" };
+                    MenuItem miSpacerBlank = new MenuItem { Header = T("Blank") };
+                    MenuItem miSpacerDot = new MenuItem { Header = T("Dot") };
 
                     // Centralized Spacer Creation Logic
                     Action<string> CreateSpacer = (prefix) =>
@@ -5662,7 +5778,7 @@ namespace Desktop_Frames
                     // Insert before Customize (safe lookup)
                     int insertIndex = CnMnFramemanager.Items.Count - 1;
                     var customizeItem = CnMnFramemanager.Items.OfType<MenuItem>()
-                        .FirstOrDefault(m => m.Header.ToString() == "Customize...");
+                        .FirstOrDefault(m => m.Header?.ToString() == T("Customize..."));
                     if (customizeItem != null) insertIndex = CnMnFramemanager.Items.IndexOf(customizeItem);
 
                     CnMnFramemanager.Items.Insert(insertIndex, miExportAllToDesktop);
@@ -5672,7 +5788,7 @@ namespace Desktop_Frames
                 // D. Name After Target (Portal Frame + Ctrl)
                 if (isCtrlPressed && isPortalFrame)
                 {
-                    miNameAfterPath = new MenuItem { Header = "Name Frame After Target Path" };
+                    miNameAfterPath = new MenuItem { Header = T("Name Frame After Target Path") };
                     miNameAfterPath.Click += (s, e) =>
                     {
                         // Get Base Path (Not navigation path)
@@ -5752,7 +5868,7 @@ namespace Desktop_Frames
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Cursor = Cursors.Hand,
                     Margin = new Thickness(0, 0, 5, 0),
-                    ToolTip = "Filter files (e.g. '*.jpg' or '>*.tmp' to exclude)",
+                    ToolTip = T("Filter files (e.g. '*.jpg' or '>*.tmp' to exclude)"),
                     Opacity = hasInitialFilter ? 1.0 : ((double)SettingsManager.MenuTintValue / 100)
                 };
 
@@ -5863,7 +5979,7 @@ namespace Desktop_Frames
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
                     Width = 20,
-                    ToolTip = "Clear filter and close"
+                    ToolTip = T("Clear filter and close")
                 };
 
                 filterBar.Children.Add(cmbFilter);
@@ -6077,6 +6193,16 @@ namespace Desktop_Frames
                 CommitRename(); // Call shared logic
             };
 
+            BeginRename = () =>
+            {
+                if (titletb.Visibility == Visibility.Visible) return;
+                titletb.Text = titlelabel.Content?.ToString() ?? frame.Title.ToString();
+                titlelabel.Visibility = Visibility.Collapsed;
+                titletb.Visibility = Visibility.Visible;
+                win.BeginKeyboardInteractiveEdit(titletb);
+                LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Focus set to title textbox for frame: {frame.Title}");
+            };
+
 
 
             //// --- STEP 4 START: Configure and Add Events ---
@@ -6194,6 +6320,19 @@ namespace Desktop_Frames
                 return;
             }
             bool isLocked = currentFrame.IsLocked?.ToString().ToLower() == "true";
+
+            System.Windows.Point titleMouseDownPoint = new System.Windows.Point();
+            bool titlePotentialRename = false;
+            DispatcherTimer titleRenameTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            titleRenameTimer.Tick += (s, e) =>
+            {
+                titleRenameTimer.Stop();
+                BeginRename?.Invoke();
+            };
+
             titlelabel.MouseDown += (sender, e) =>
             {
                 // FIX: Directly call CommitRename logic
@@ -6205,6 +6344,10 @@ namespace Desktop_Frames
 
                 if (e.ClickCount == 2)
                 {
+                    titlePotentialRename = false;
+                    titleRenameTimer.Stop();
+                    titlelabel.ReleaseMouseCapture();
+
                     // Roll-up/roll-down logic (swapped from Ctrl+Click)
                     NonActivatingWindow win = FindVisualParent<NonActivatingWindow>(titlelabel);
                     string frameId = win?.Tag?.ToString();
@@ -6354,42 +6497,66 @@ namespace Desktop_Frames
                 }
                 else if (e.LeftButton == MouseButtonState.Pressed)
                 {
-                    if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
-                    {
-                        // Rename frame (swapped from double-click)
-                        titletb.Text = titlelabel.Content.ToString();
-                        titlelabel.Visibility = Visibility.Collapsed;
-                        titletb.Visibility = Visibility.Visible;
-                        win.BeginKeyboardInteractiveEdit(titletb);
-                        LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Focus set to title textbox for frame: {frame.Title}");
-                        e.Handled = true;
-                    }
-                    else
-                    {
-                        string frameId = win.Tag?.ToString();
-                        if (string.IsNullOrEmpty(frameId))
-                        {
-                            LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Frame Id is missing for window '{win.Title}' during MouseDown");
-                            return;
-                        }
-                        dynamic currentFrame = FrameDataManager.FrameData.FirstOrDefault(f => f.Id?.ToString() == frameId);
-                        if (currentFrame == null)
-                        {
-                            LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Frame with Id '{frameId}' not found in FrameDataManager.FrameData during MouseDown");
-                            return;
-                        }
-                        bool isLocked = currentFrame.IsLocked?.ToString().ToLower() == "true";
-                        if (!isLocked)
-                        {
-                            win.DragMove();
-                            LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Dragging frame '{currentFrame.Title}'");
-                        }
-                        else
-                        {
-                            LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"DragMove blocked for locked frame '{currentFrame.Title}'");
-                        }
-                    }
+                    titlePotentialRename = true;
+                    titleRenameTimer.Stop();
+                    titleMouseDownPoint = e.GetPosition(win);
+                    titlelabel.CaptureMouse();
+                    e.Handled = true;
                 }
+            };
+
+            titlelabel.MouseMove += (sender, e) =>
+            {
+                if (!titlePotentialRename || e.LeftButton != MouseButtonState.Pressed) return;
+
+                System.Windows.Point currentPoint = e.GetPosition(win);
+                if (Math.Abs(currentPoint.X - titleMouseDownPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                    Math.Abs(currentPoint.Y - titleMouseDownPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+                {
+                    return;
+                }
+
+                titlePotentialRename = false;
+                titleRenameTimer.Stop();
+                titlelabel.ReleaseMouseCapture();
+
+                string frameId = win.Tag?.ToString();
+                if (string.IsNullOrEmpty(frameId))
+                {
+                    LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Frame Id is missing for window '{win.Title}' during MouseMove");
+                    return;
+                }
+
+                dynamic dragFrame = FrameDataManager.FrameData.FirstOrDefault(f => f.Id?.ToString() == frameId);
+                if (dragFrame == null)
+                {
+                    LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Frame with Id '{frameId}' not found in FrameDataManager.FrameData during MouseMove");
+                    return;
+                }
+
+                bool frameLocked = dragFrame.IsLocked?.ToString().ToLower() == "true";
+                if (!frameLocked)
+                {
+                    win.DragMove();
+                    LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"Dragging frame '{dragFrame.Title}'");
+                }
+                else
+                {
+                    LogManager.Log(LogManager.LogLevel.Debug, LogManager.LogCategory.FrameCreation, $"DragMove blocked for locked frame '{dragFrame.Title}'");
+                }
+
+                e.Handled = true;
+            };
+
+            titlelabel.MouseLeftButtonUp += (sender, e) =>
+            {
+                if (!titlePotentialRename) return;
+
+                titlePotentialRename = false;
+                titlelabel.ReleaseMouseCapture();
+                titleRenameTimer.Stop();
+                titleRenameTimer.Start();
+                e.Handled = true;
             };
 
 
@@ -6841,6 +7008,11 @@ namespace Desktop_Frames
                                     }
                                 }
 
+                                bool shouldMoveDesktopFile = false;
+                                bool shouldRestoreDesktopShortcut = false;
+                                string desktopRestorePath = null;
+                                string storedDesktopPath = null;
+
                                 if (!isDroppedShortcut && !isDroppedUrlFile)
                                 {
                                     // CASE A: Creating new shortcut from raw file/folder
@@ -6857,6 +7029,28 @@ namespace Desktop_Frames
                                         shortcut.TargetPath = droppedFile;
                                         if (isFolder) shortcut.WorkingDirectory = droppedFile;
                                         shortcut.Save();
+                                        shouldMoveDesktopFile = SettingsManager.DeleteOriginalShortcutsOnDrop && !isFolder && IsFromDesktop(droppedFile);
+
+                                        if (shouldMoveDesktopFile)
+                                        {
+                                            try
+                                            {
+                                                desktopRestorePath = droppedFile;
+                                                string storedPath = MoveDesktopFileIntoProfileStorage(droppedFile);
+                                                if (!string.Equals(storedPath, droppedFile, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    RetargetShortcut(shortcutName, storedPath, false);
+                                                    targetPath = storedPath;
+                                                    storedDesktopPath = storedPath;
+                                                }
+                                            }
+                                            catch (Exception moveEx)
+                                            {
+                                                LogManager.Log(LogManager.LogLevel.Warn, LogManager.LogCategory.FrameCreation,
+                                                    $"Could not move desktop item into profile storage: {moveEx.Message}");
+                                                shouldMoveDesktopFile = false;
+                                            }
+                                        }
                                     }
                                     catch { continue; }
                                 }
@@ -6890,6 +7084,12 @@ namespace Desktop_Frames
                                     {
                                         System.IO.File.Copy(droppedFile, shortcutName, true);
                                     }
+
+                                    shouldRestoreDesktopShortcut = SettingsManager.DeleteOriginalShortcutsOnDrop && isDroppedShortcut && !isFolder && !isWebLink && IsFromDesktop(droppedFile);
+                                    if (shouldRestoreDesktopShortcut)
+                                    {
+                                        desktopRestorePath = droppedFile;
+                                    }
                                 }
 
                                 dynamic newItem = new System.Dynamic.ExpandoObject();
@@ -6899,6 +7099,20 @@ namespace Desktop_Frames
                                 newItemDict["IsFolder"] = isFolder;
                                 newItemDict["IsLink"] = isWebLink;
                                 newItemDict["IsNetwork"] = IsNetworkPath(shortcutName);
+
+                                if (shouldMoveDesktopFile)
+                                {
+                                    newItemDict[DesktopItemLifecycleManager.RestoreToDesktopOnExitKey] = true;
+                                    newItemDict[DesktopItemLifecycleManager.DesktopRestoreKindKey] = DesktopItemLifecycleManager.FileKind;
+                                    newItemDict[DesktopItemLifecycleManager.DesktopRestorePathKey] = desktopRestorePath;
+                                    newItemDict[DesktopItemLifecycleManager.StoredItemPathKey] = storedDesktopPath;
+                                }
+                                else if (shouldRestoreDesktopShortcut)
+                                {
+                                    newItemDict[DesktopItemLifecycleManager.RestoreToDesktopOnExitKey] = true;
+                                    newItemDict[DesktopItemLifecycleManager.DesktopRestoreKindKey] = DesktopItemLifecycleManager.ShortcutKind;
+                                    newItemDict[DesktopItemLifecycleManager.DesktopRestorePathKey] = desktopRestorePath;
+                                }
 
                                 // --- BUG FIX: Display Name for Network Roots & Folders ---
                                 string displayFileName = System.IO.Path.GetFileNameWithoutExtension(droppedFile);
@@ -7008,19 +7222,11 @@ namespace Desktop_Frames
                                     // Attach Context Menu
                                     AttachIconContextMenu(sp, newItem, frame, win);
 
-                                    // --- HIDDEN TWEAK: Delete Original Shortcut On Drop ---
-                                    if (SettingsManager.DeleteOriginalShortcutsOnDrop && isDroppedShortcut && !isFolder && !isWebLink)
+                                    if (shouldRestoreDesktopShortcut)
                                     {
                                         try
                                         {
-                                            string fileDir = System.IO.Path.GetDirectoryName(droppedFile);
-                                            string userDesktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                                            string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
-
-                                            bool isFromDesktop = string.Equals(fileDir, userDesktop, StringComparison.OrdinalIgnoreCase) ||
-                                                                 string.Equals(fileDir, commonDesktop, StringComparison.OrdinalIgnoreCase);
-
-                                            if (isFromDesktop) System.IO.File.Delete(droppedFile);
+                                            System.IO.File.Delete(droppedFile);
                                         }
                                         catch { }
                                     }

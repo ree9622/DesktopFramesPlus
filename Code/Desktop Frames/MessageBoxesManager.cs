@@ -100,8 +100,8 @@ namespace Desktop_Frames
 
             public CustomYesNoMessageBoxWindow(string message, string title, NotificationSound? overrideSound = null)
             {
-                _message = message;
-                _title = title;
+                _message = LocalizationManager.T(message);
+                _title = LocalizationManager.T(title);
                 InitializeComponent();
                 PositionWindowOnMouseScreen(this);
                 PlayDingSound(overrideSound);
@@ -257,7 +257,7 @@ namespace Desktop_Frames
                 // No Button
                 Button btnNo = new Button
                 {
-                    Content = "No",
+                    Content = LocalizationManager.T("No"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -276,7 +276,7 @@ namespace Desktop_Frames
                 // Yes Button (Red for Reset/Danger actions)
                 Button btnYes = new Button
                 {
-                    Content = "Yes",
+                    Content = LocalizationManager.T("Yes"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -375,8 +375,8 @@ namespace Desktop_Frames
 
             public AutoClosingMessageBoxWindow(string message, string title, int autoCloseTimeMs)
             {
-                _message = message;
-                _title = title;
+                _message = LocalizationManager.T(message);
+                _title = LocalizationManager.T(title);
                 _autoCloseTimeMs = autoCloseTimeMs;
                 _remainingSeconds = autoCloseTimeMs / 1000;
                 InitializeComponent();
@@ -803,8 +803,8 @@ namespace Desktop_Frames
 
             public OKOnlyMessageBoxWindow(string message, string title)
             {
-                _message = message;
-                _title = title;
+                _message = LocalizationManager.T(message);
+                _title = LocalizationManager.T(title);
                 InitializeComponent();
                 PositionWindowOnMouseScreen(this);
                 PlayDingSound();
@@ -965,7 +965,7 @@ namespace Desktop_Frames
                 // OK button with user's accent color
                 Button btnOK = new Button
                 {
-                    Content = "OK",
+                    Content = LocalizationManager.T("OK"),
                     Width = 90,
                     Height = 36,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -1055,7 +1055,7 @@ namespace Desktop_Frames
                 _userAccentColor = mediaColor;
 
                 // Modern WPF window setup
-                this.Title = "Delete Tab";
+                this.Title = LocalizationManager.T("Delete Tab");
                 this.Width = 420;
                 this.Height = 220;
                 this.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -1151,7 +1151,7 @@ namespace Desktop_Frames
 
                 TextBlock titleLabel = new TextBlock
                 {
-                    Text = "Delete Tab",
+                    Text = LocalizationManager.T("Delete Tab"),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 18,
                     FontWeight = FontWeights.Bold,
@@ -1159,10 +1159,14 @@ namespace Desktop_Frames
                     Margin = new Thickness(0, 0, 0, 4)
                 };
 
-                string itemText = _itemCount == 1 ? "item" : "items";
+                string itemText = _itemCount == 1 ? LocalizationManager.T("item") : LocalizationManager.T("items");
                 TextBlock messageLabel = new TextBlock
                 {
-                    Text = $"Are you sure you want to delete tab\n '{_tabName}'?\nThis tab contains {_itemCount} {itemText} that will be permanently removed.",
+                    Text = LocalizationManager.T(
+                        "Are you sure you want to delete tab\n '{0}'?\nThis tab contains {1} {2} that will be permanently removed.",
+                        _tabName,
+                        _itemCount,
+                        itemText),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 14,
                     Foreground = new SolidColorBrush(Color.FromRgb(95, 99, 104)),
@@ -1187,7 +1191,7 @@ namespace Desktop_Frames
                 // No button (safe action)
                 Button btnNo = new Button
                 {
-                    Content = "No",
+                    Content = LocalizationManager.T("No"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -1213,7 +1217,7 @@ namespace Desktop_Frames
                 // Yes button (danger action)
                 Button btnYes = new Button
                 {
-                    Content = "Yes",
+                    Content = LocalizationManager.T("Yes"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -1537,7 +1541,7 @@ namespace Desktop_Frames
 
                 TextBlock titleLabel = new TextBlock
                 {
-                    Text = "Delete frame",
+                    Text = LocalizationManager.T("Delete frame"),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 18,
                     FontWeight = FontWeights.Bold,
@@ -1547,7 +1551,7 @@ namespace Desktop_Frames
 
                 TextBlock messageLabel = new TextBlock
                 {
-                    Text = "Are you sure you want to delete this frame?",
+                    Text = LocalizationManager.T("Are you sure you want to delete this frame?"),
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 14,
                     Foreground = new SolidColorBrush(Color.FromRgb(95, 99, 104)),
@@ -1572,7 +1576,7 @@ namespace Desktop_Frames
                 // No button with user's accent color (safe action)
                 Button btnNo = new Button
                 {
-                    Content = "No",
+                    Content = LocalizationManager.T("No"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -1599,7 +1603,7 @@ namespace Desktop_Frames
                 // Yes button with danger styling
                 Button btnYes = new Button
                 {
-                    Content = "Yes",
+                    Content = LocalizationManager.T("Yes"),
                     Width = 80,
                     Height = 32,
                     FontFamily = new FontFamily("Segoe UI"),
@@ -1711,4 +1715,3 @@ namespace Desktop_Frames
 
 
 #endregion
-

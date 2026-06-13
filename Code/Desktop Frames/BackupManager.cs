@@ -160,7 +160,6 @@ namespace Desktop_Frames
             {
                 LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.ImportExport, $"Starting export of frame: {frame.Title}");
 
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                 string frameTitle = frame.Title.ToString();
 
                 // Sanitize folder name
@@ -180,12 +179,9 @@ namespace Desktop_Frames
                 // ---------------------------------------------------------------------------
 
                 // Exports go to GLOBAL "Exports" folder (shared between profiles)
-                string exportFolder = Path.Combine(exeDir, "Exports", frameTitle);
-                string framePath = Path.Combine(exeDir, "Exports", $"{frameTitle}.frame"); // NEW FORMAT
-
-                // Ensure exports directory exists
-                string exportsDir = Path.Combine(exeDir, "Exports");
-                if (!Directory.Exists(exportsDir)) Directory.CreateDirectory(exportsDir);
+                string exportsDir = ProfileManager.GetDataFolderPath("Exports");
+                string exportFolder = Path.Combine(exportsDir, frameTitle);
+                string framePath = Path.Combine(exportsDir, $"{frameTitle}.frame"); // NEW FORMAT
 
                 // Cleanup previous runs
                 if (Directory.Exists(exportFolder)) Directory.Delete(exportFolder, true);
@@ -279,14 +275,13 @@ namespace Desktop_Frames
             {
                 LogManager.Log(LogManager.LogLevel.Info, LogManager.LogCategory.ImportExport, "Starting frame import process");
 
-                string exeDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-				string exportsDir = Path.Combine(exeDir, "Exports");
+				string exportsDir = ProfileManager.GetDataFolderPath("Exports");
 
                 var openDialog = new Microsoft.Win32.OpenFileDialog
                 {
                     Filter = "Frame Files|*.frame;*.fence", // SUPPORT BOTH EXTENSIONS
                     DefaultExt = ".frame", // DEFAULT TO NEW
-                    InitialDirectory = Directory.Exists(exportsDir) ? exportsDir : exeDir,
+                    InitialDirectory = exportsDir,
                     Title = "Select Frame Export File"
                 };
 

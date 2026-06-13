@@ -18,6 +18,8 @@ namespace Desktop_Frames
 	/// </summary>
 	public static class NoteFramemanager
     {
+        private static string T(string text) => LocalizationManager.T(text);
+
 		#region Note Content Creation - Used by: Framemanager.CreateFrame()
 
 		/// <summary>
@@ -320,7 +322,7 @@ namespace Desktop_Frames
                             FontSize = 14,
                             FontWeight = FontWeights.Bold,
                             Cursor = Cursors.Hand,
-                            ToolTip = "Click to finish editing",
+                    ToolTip = T("Click to finish editing"),
                             Visibility = Visibility.Collapsed,
                         };
 
@@ -434,7 +436,7 @@ namespace Desktop_Frames
                     }
                 };
 
-                noteTextBox.ToolTip = "Click to edit note content";
+                noteTextBox.ToolTip = T("Click to edit note content");
             }
             catch (Exception ex)
             {
@@ -521,7 +523,7 @@ namespace Desktop_Frames
  
 
                 // Text Format form (new unified approach)
-                MenuItem textFormatFormItem = new MenuItem { Header = "Text Format..." };
+                MenuItem textFormatFormItem = new MenuItem { Header = T("Text Format...") };
                 textFormatFormItem.Click += (s, e) =>
                 {
                     try
@@ -542,11 +544,11 @@ namespace Desktop_Frames
                 // A seperator to commnds to note-specific commands
                 menu.Items.Add(new Separator());
 
-                MenuItem copyAllItem = new MenuItem { Header = "Copy All Text" };
+                MenuItem copyAllItem = new MenuItem { Header = T("Copy All Text") };
                 copyAllItem.Click += (s, e) => CopyAllNoteText(noteTextBox);
                 menu.Items.Add(copyAllItem);
 
-                MenuItem clearAllItem = new MenuItem { Header = "Clear All Text" };
+                MenuItem clearAllItem = new MenuItem { Header = T("Clear All Text") };
                 clearAllItem.Click += (s, e) => ClearAllNoteText(frame, noteTextBox);
                 menu.Items.Add(clearAllItem);
 
@@ -1158,7 +1160,7 @@ namespace Desktop_Frames
         private static string GetWordWrapMenuText(string currentState)
         {
             bool isEnabled = currentState?.ToLower() != "false";
-            return isEnabled ? "✓ Word Wrap" : "Word Wrap";
+            return isEnabled ? $"✓ {T("Word Wrap")}" : T("Word Wrap");
         }
 
         /// <summary>
@@ -1167,7 +1169,7 @@ namespace Desktop_Frames
         private static string GetSpellCheckMenuText(string currentState)
         {
             bool isEnabled = currentState?.ToLower() != "false";
-            return isEnabled ? "✓ Spell Check" : "Spell Check";
+            return isEnabled ? $"✓ {T("Spell Check")}" : T("Spell Check");
         }
 		#endregion
 

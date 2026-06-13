@@ -9,6 +9,17 @@ public class NonActivatingWindow : Window
     private const int WM_SYSCOMMAND = 0x0112;
     private const int SC_MAXIMIZE = 0xF030;
     private const int SC_RESTORE = 0xF120;
+    private const int WM_NCHITTEST = 0x0084;
+    private const int HTCLIENT = 1;
+    private const int HTLEFT = 10;
+    private const int HTRIGHT = 11;
+    private const int HTTOP = 12;
+    private const int HTTOPLEFT = 13;
+    private const int HTTOPRIGHT = 14;
+    private const int HTBOTTOM = 15;
+    private const int HTBOTTOMLEFT = 16;
+    private const int HTBOTTOMRIGHT = 17;
+    private const double ResizeBorderThickness = 8.0;
 
     private const int WM_MOUSEACTIVATE = 0x0021;
     private const int MA_NOACTIVATE = 3;
@@ -45,6 +56,16 @@ public class NonActivatingWindow : Window
             Framemanager.OnResizingEnded(this);
         }
 
+        if (msg == WM_NCHITTEST && ResizeMode != ResizeMode.NoResize)
+        {
+            IntPtr hitTest = HitTestResizeBorder(lParam);
+            if (hitTest != IntPtr.Zero)
+            {
+                handled = true;
+                return hitTest;
+            }
+        }
+
         // Handle existing focus prevention
 
         if (_focusPreventionEnabled && msg == WM_MOUSEACTIVATE)
@@ -63,6 +84,33 @@ public class NonActivatingWindow : Window
                 return IntPtr.Zero;
             }
         }
+
+        return IntPtr.Zero;
+    }
+
+    private IntPtr HitTestResizeBorder(IntPtr lParam)
+    {
+        int x = unchecked((short)((long)lParam & 0xFFFF));
+        int y = unchecked((short)(((long)lParam >> 16) & 0xFFFF));
+        Point position = PointFromScreen(new Point(x, y));
+
+        double width = ActualWidth;
+        double height = ActualHeight;
+        if (width <= 0 || height <= 0) return IntPtr.Zero;
+
+        bool left = position.X >= 0 && position.X <= ResizeBorderThickness;
+        bool right = position.X <= width && position.X >= width - ResizeBorderThickness;
+        bool top = position.Y >= 0 && position.Y <= ResizeBorderThickness;
+        bool bottom = position.Y <= height && position.Y >= height - ResizeBorderThickness;
+
+        if (top && left) return new IntPtr(HTTOPLEFT);
+        if (top && right) return new IntPtr(HTTOPRIGHT);
+        if (bottom && left) return new IntPtr(HTBOTTOMLEFT);
+        if (bottom && right) return new IntPtr(HTBOTTOMRIGHT);
+        if (left) return new IntPtr(HTLEFT);
+        if (right) return new IntPtr(HTRIGHT);
+        if (top) return new IntPtr(HTTOP);
+        if (bottom) return new IntPtr(HTBOTTOM);
 
         return IntPtr.Zero;
     }
