@@ -221,7 +221,7 @@ namespace Desktop_Frames
                 }
 
                 string desktopPath = GetString(item, DesktopRestorePathKey);
-                if (!IsDesktopPath(desktopPath) || !PathExists(desktopPath)) return false;
+                if (!IsDesktopPath(desktopPath) || !PathExists(desktopPath) || ShouldSkipCollectingPath(desktopPath)) return false;
 
                 Directory.CreateDirectory(storedDir);
                 string storedPath = GetUniquePath(Path.Combine(storedDir, Path.GetFileName(desktopPath)));

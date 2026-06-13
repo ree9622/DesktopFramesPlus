@@ -1891,6 +1891,7 @@ namespace Desktop_Frames
             bool isFile = System.IO.File.Exists(desktopFile);
             bool isDirectory = System.IO.Directory.Exists(desktopFile);
             if ((!isFile && !isDirectory) || !IsFromDesktop(desktopFile)) return desktopFile;
+            if (ShouldKeepOnDesktop(desktopFile)) return desktopFile;
 
             string storageDir = ProfileManager.GetProfileFilePath("Stored Desktop Items");
             if (!System.IO.Directory.Exists(storageDir)) System.IO.Directory.CreateDirectory(storageDir);
@@ -1916,6 +1917,31 @@ namespace Desktop_Frames
             }
 
             return destination;
+        }
+
+        private static bool ShouldKeepOnDesktop(string desktopPath)
+        {
+            try
+            {
+                string fullPath = System.IO.Path.GetFullPath(desktopPath)
+                    .TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+                string appBase = System.IO.Path.GetFullPath(AppContext.BaseDirectory)
+                    .TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+
+                if (string.Equals(fullPath, appBase, StringComparison.OrdinalIgnoreCase)
+                    || appBase.StartsWith(fullPath + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string folderName = System.IO.Path.GetFileName(fullPath);
+                return folderName.StartsWith("DesktopFramesPlus-test-run-", StringComparison.OrdinalIgnoreCase)
+                    || folderName.StartsWith("DesktopFramesPlus-source-run-", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return true;
+            }
         }
 
         private static void RetargetShortcut(string shortcutPath, string targetPath, bool isFolder)
